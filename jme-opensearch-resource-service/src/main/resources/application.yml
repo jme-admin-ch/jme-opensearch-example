@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: "jme-opensearch-resource-service"
+server:
+  servlet:
+    context-path: /${spring.application.name}
+
+jeap:
+  messaging:
+    kafka:
+      error-topic-name: jme-messageprocessing-failed
+      system-name: JME
+      service-name: ${spring.application.name}
+  monitor:
+    prometheus:
+      user: "prometheus"
+      password: "{noop}secret"
+  security:
+    oauth2:
+      resourceserver:
+        system-name: jme
+
+jme:
+  opensearch:
+    topic:
+      create-transit-document: "jme-create-transit-document"
+      transit-decision-created: "jme-transit-decision-created"

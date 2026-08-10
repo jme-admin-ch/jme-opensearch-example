@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: "jme-opensearch-index-writer-service"
+server:
+  servlet:
+    context-path: /${spring.application.name}
+jeap:
+  monitor:
+    prometheus:
+      user: "prometheus"
+      password: "{noop}secret"
+  messaging:
+    kafka:
+      system-name: "JME"
+      service-name: "jme-opensearch-index-writer-service"
+      error-topic-name: "jme-messageprocessing-failed"
+
+togglz:
+  feature-enums: ch.admin.bit.jme.opensearch.indexwriter.JmeFeatureFlags
+
+logging:
+  level:
+    ch.admin.bit.jeap.opensearch: DEBUG

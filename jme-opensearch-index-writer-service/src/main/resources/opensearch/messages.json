@@ -1,0 +1,32 @@
+{
+  "messages": [
+    {
+      "messageName": "JmeCreateTransitDocumentCommand",
+      "topicName": "jme-create-transit-document",
+      "operations": [
+        {
+          "indexType": "JmeTransitDocument",
+          "indexOperation": "UPSERT",
+          "condition": "ch.admin.bit.jme.opensearch.indexwriter.condition.JmeTransitDocumentCondition",
+          "uri": "${jme.opensearch.resource.base-uri}",
+          "oauthClientId": "index-writer-read-client",
+          "referenceProvider": "ch.admin.bit.jme.opensearch.indexwriter.referenceprovider.JmeTransitDocumentReferenceProvider"
+        }
+      ]
+    },
+    {
+      "messageName": "JmeTransitDecisionCreatedEvent",
+      "topicName": "jme-transit-decision-created",
+      "operations": [
+        {
+          "indexType": "JmeTransitDecision",
+          "indexOperation": "UPSERT",
+          "uri": "${jme.opensearch.resource.base-uri}",
+          "oauthClientId": "index-writer-read-client",
+          "referenceProvider": "ch.admin.bit.jme.opensearch.indexwriter.referenceprovider.JmeTransitDecisionReferenceProvider",
+          "featureFlag": "JME_TRANSIT_DECISION_INDEXING"
+        }
+      ]
+    }
+  ]
+}

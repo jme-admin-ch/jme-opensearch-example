@@ -1,0 +1,10 @@
+server:
+  port: 8180
+
+jeap:
+  web:
+    tls:
+      enabled: false
+
+mockserver:
+  base-url: "http://localhost:${server.port}/jme-opensearch-auth-scs"

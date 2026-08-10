@@ -1,0 +1,5 @@
+jeap:
+  opensearch:
+    client:
+      connection:
+        uri: "http://opensearch:9200"

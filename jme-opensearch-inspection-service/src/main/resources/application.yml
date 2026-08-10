@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: "jme-opensearch-inspection-service"
+server:
+  servlet:
+    context-path: /${spring.application.name}
+
+jeap:
+  monitor:
+    prometheus:
+      user: "prometheus"
+      password: "{noop}secret"
+  security:
+    oauth2:
+      resourceserver:
+        system-name: jme
+
+springdoc:
+  swagger-ui:
+    oauth:
+      client-id: "inspection-internal-sys"

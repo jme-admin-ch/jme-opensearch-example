@@ -1,0 +1,22 @@
+server:
+  port: 8581
+
+jeap:
+  swagger:
+    status: open
+  web:
+    tls:
+      enabled: false
+  messaging:
+    kafka:
+     bootstrapServers: "http://localhost:12000"
+     schemaRegistryUrl: "http://localhost:13000"
+     username: broker-user
+     password: broker-secret
+     securityProtocol: SASL_PLAINTEXT
+  security:
+    oauth2:
+      resourceserver:
+        authorization-server:
+          issuer: "http://localhost:8180/jme-opensearch-auth-scs"
+          jwk-set-uri: "http://localhost:8180/jme-opensearch-auth-scs/.well-known/jwks.json"

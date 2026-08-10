@@ -1,0 +1,41 @@
+server:
+  port: 8580
+
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          index-writer-read-client:
+            client-id: "index-writer-read-client"
+            client-secret: "secret"
+            authorization-grant-type: "client_credentials"
+            provider: "default-provider"
+        provider:
+          default-provider:
+            token-uri: "http://localhost:8180/jme-opensearch-auth-scs/oauth2/token"
+            jwk-set-uri: "http://localhost:8180/jme-opensearch-auth-scs/.well-known/jwks.json"
+
+jeap:
+  opensearch:
+    indexwriter:
+      connection:
+        url: "http://localhost:9200"
+      # 0 replicas: single-node local cluster stays GREEN with no replicas
+      index-templates:
+        default:
+          number-of-shards: 1
+          number-of-replicas: 0
+          refresh-interval: "1s"
+  messaging:
+    kafka:
+      bootstrapServers: "http://localhost:12000"
+      schemaRegistryUrl: "http://localhost:13000"
+      username: broker-user
+      password: broker-secret
+      securityProtocol: SASL_PLAINTEXT
+
+jme:
+  opensearch:
+    resource:
+      base-uri: "http://localhost:8581/jme-opensearch-resource-service"

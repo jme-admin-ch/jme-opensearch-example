@@ -1,0 +1,19 @@
+server:
+  port: 8582
+
+jeap:
+  opensearch:
+    client:
+      connection:
+        uri: "http://localhost:9200"
+  swagger:
+    status: open
+  web:
+    tls:
+      enabled: false
+  security:
+    oauth2:
+      resourceserver:
+        authorization-server:
+          issuer: "http://localhost:8180/jme-opensearch-auth-scs"
+          jwk-set-uri: "http://localhost:8180/jme-opensearch-auth-scs/.well-known/jwks.json"

@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ch.admin.bit.jeap</groupId>
+        <artifactId>jme-opensearch-example</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+
+    <artifactId>jme-opensearch-index-writer-service</artifactId>
+    <name>${project.artifactId}</name>
+    <description>Portable JME instance of the event-driven jEAP OpenSearch index writer.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>ch.admin.bit.jeap</groupId>
+            <artifactId>jeap-opensearch-index-writer-service-instance</artifactId>
+            <type>pom</type>
+        </dependency>
+        <dependency>
+            <groupId>ch.admin.bit.jeap</groupId>
+            <artifactId>jeap-opensearch-index-type</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ch.admin.bit.jeap.jme.messagetype.jme</groupId>
+            <artifactId>jme-create-transit-document-command</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.admin.bit.jeap.jme.messagetype.jme</groupId>
+            <artifactId>jme-transit-decision-created-event</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.admin.bit.jeap.jme.messagetype.jme</groupId>
+            <artifactId>jme-document-created-event</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.admin.bit.jeap.messagetype._shared</groupId>
+            <artifactId>shared-archived-artifact-version-created-event</artifactId>
+            <version>2.0.2</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.admin.bit.jeap.jme.indextype.jme</groupId>
+            <artifactId>jme-transit-decision-v1</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.admin.bit.jeap.jme.indextype.jme</groupId>
+            <artifactId>jme-transit-decision-v2</artifactId>
+            <version>2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.admin.bit.jeap.jme.indextype.jme</groupId>
+            <artifactId>jme-transit-document-v1</artifactId>
+            <version>1.2</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.admin.bit.jeap.jme.indextype.jme</groupId>
+            <artifactId>jme-decree-document-v1</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.admin.bit.jeap.jme.indextype.jme</groupId>
+            <artifactId>jme-decree-v1</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.admin.bit.jeap.jme.indextype.jme</groupId>
+            <artifactId>jme-diagram-v1</artifactId>
+            <version>1.0</version>
+        </dependency>
+
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>ch.admin.bit.jeap.opensearch.indexwriter.web.OpenSearchIndexWriterApplication</mainClass>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>none</phase>
+                    </execution>
+                    <execution>
+                        <id>spring-boot</id>
+                        <goals><goal>build-info</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

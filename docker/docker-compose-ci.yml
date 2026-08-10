@@ -1,0 +1,19 @@
+# CI overlay for docker-compose. The test runner and containers share an isolated external network.
+
+services:
+  broker:
+    ports: !reset [ ]
+
+  schema-registry:
+    ports: !reset [ ]
+
+  opensearch:
+    ports: !reset [ ]
+
+  opensearch-dashboards:
+    ports: !reset [ ]
+
+networks:
+  default:
+    external: true
+    name: ${COMPOSE_PROJECT_NAME}_default

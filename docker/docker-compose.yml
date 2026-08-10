@@ -1,0 +1,115 @@
+services:
+  ############################################
+  # Kafka Cluster
+  ############################################
+
+  broker:
+    image: confluentinc/cp-kafka:8.2.0
+    hostname: broker
+    ports:
+      - "12000:12000"
+    volumes:
+      - ./kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
+    environment:
+      # KRaft mode settings
+      KAFKA_BROKER_ID: 1
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@broker:29093'
+      # KRaft cluster ID - format properly, a 22-character base64-encoded string, for the confluent platform
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:12000
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:12000,CONTROLLER://0.0.0.0:29093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # Authentication
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf"
+      KAFKA_SASL_ENABLED_MECHANISMS: SCRAM-SHA-512
+      # Temporary storage settings
+      KAFKA_LOG_DIRS: /tmp/kafka-logs
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  broker-init:
+    image: confluentinc/cp-kafka:8.2.0
+    command: >
+      bash -c "for attempt in {1..60}; do
+        kafka-configs --bootstrap-server broker:29092 --alter --add-config 'SCRAM-SHA-512=[password=broker-secret]' --entity-type users --entity-name broker-user &&
+        touch /tmp/broker-init-ready && exec tail -f /dev/null;
+        sleep 2;
+      done;
+      exit 1"
+    depends_on:
+      - broker
+    healthcheck:
+      test: [ "CMD-SHELL", "test -f /tmp/broker-init-ready" ]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+      start_period: 90s
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:8.2.0
+    hostname: schema-registry
+    depends_on:
+      broker:
+        condition: service_started
+      broker-init:
+        condition: service_healthy
+    ports:
+      - "13000:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://broker:29092
+
+  ############################################
+  # OpenSearch
+  ############################################
+
+  opensearch:
+    # Keep OpenSearch and Dashboards on the latest patch published for both images in the 3.3 line.
+    image: opensearchproject/opensearch:3.3.0
+    environment:
+      - discovery.type=single-node
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - DISABLE_SECURITY_PLUGIN=true
+      # Disable disk watermark checks for local development (avoids index-create blocks on low-disk hosts)
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - cluster.routing.allocation.disk.threshold_enabled=false
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: [ "CMD", "curl", "-sf", "http://localhost:9200" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  opensearch-init:
+    image: opensearchproject/opensearch:3.3.0
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    entrypoint: [ "/bin/sh", "-c" ]
+    command: >
+      "curl -sf -X PUT http://opensearch:9200/_cluster/settings
+      -H 'Content-Type: application/json'
+      -d '{\"persistent\":{\"cluster.blocks.create_index\":null}}' &&
+      touch /tmp/opensearch-init-ready && tail -f /dev/null"
+    healthcheck:
+      test: [ "CMD-SHELL", "test -f /tmp/opensearch-init-ready" ]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:3.3.0
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    ports:
+      - "5601:5601" # Map host port 5601 to container port 5601
+    expose:
+      - "5601" # Expose port 5601 for web access to OpenSearch Dashboards
+    environment:
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: true
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]' # Define the OpenSearch nodes that OpenSearch Dashboards will query

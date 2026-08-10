@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: "jme-opensearch-auth-scs"
+server:
+  servlet:
+    context-path: /${spring.application.name}
+jeap:
+  monitor:
+    prometheus:
+      user: "prometheus"
+      password: "{noop}secret"
+oauth-mock-data:
+  clients:
+    - client-id: "index-writer-read-client"
+      client-secret: "{noop}secret"
+      context: "SYS"
+      userroles: ["jme_@searchitem_#read"]
+
+    - client-id: "inspection-internal-sys"
+      client-secret: "{noop}secret"
+      context: "SYS"
+      subject: "internal-sys"
+      userroles: ["jme_read"]
+    - client-id: "inspection-bp1-sys"
+      client-secret: "{noop}secret"
+      context: "SYS"
+      subject: "bp1-sys"
+      bproles:
+        BP1: ["jme_read"]
+    - client-id: "inspection-bp2-sys"
+      client-secret: "{noop}secret"
+      context: "SYS"
+      subject: "bp2-sys"
+      bproles:
+        BP2: ["jme_read"]
+    - client-id: "inspection-no-access-sys"
+      client-secret: "{noop}secret"
+      context: "SYS"
+      subject: "no-access-sys"
+      userroles: ["jme_no_access"]

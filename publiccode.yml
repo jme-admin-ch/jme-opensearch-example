@@ -1,0 +1,39 @@
+publiccodeYmlVersion: 0.5.0
+name: jme-opensearch-example
+applicationSuite: JME
+url: "https://github.com/jme-admin-ch/jme-opensearch-example.git"
+landingURL: "https://github.com/jme-admin-ch/jme"
+platforms:
+  - web
+categories:
+  - application-development
+developmentStatus: stable
+softwareType: standalone/backend
+organisation:
+  uri: https://ld.admin.ch/office/V.1.7
+  name: Federal Office of Information Technology, Systems and Telecommunication
+description:
+  en:
+    localisedName: JME OpenSearch Example
+    shortDescription: Example of event-driven indexing and authorization-aware OpenSearch queries with jEAP.
+    longDescription: >
+      This example demonstrates how a resource service publishes Kafka messages, how a jEAP index writer retrieves and
+      indexes SearchItems in OpenSearch, and how an inspection service performs type-safe, authorization-aware searches.
+      It includes local Kafka, Schema Registry, OpenSearch, OpenSearch Dashboards and OAuth infrastructure. The portable
+      application code also supports indexing decrees and decree documents emitted by the JME Process Archive example.
+    features:
+      - Event-driven OpenSearch indexing
+      - Type-safe and authorization-aware searches
+      - Local Kafka and OpenSearch infrastructure
+      - Optional Process Archive integration
+legal:
+  license: Apache-2.0
+maintenance:
+  type: internal
+  contacts:
+    - name: Federal Office of Information Technology, Systems and Telecommunication FOITT
+      email: jeap-community@bit.admin.ch
+localisation:
+  localisationReady: false
+  availableLanguages:
+    - en

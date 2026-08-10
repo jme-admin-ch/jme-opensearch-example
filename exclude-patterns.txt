@@ -1,0 +1,4 @@
+application-local.yml
+jme-opensearch-auth-scs/src/main/resources/application.yml
+docker/kafka_server_jaas.conf
+README.md
