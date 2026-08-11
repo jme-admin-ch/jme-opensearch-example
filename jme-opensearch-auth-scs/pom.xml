@@ -6,13 +6,17 @@
     <parent>
         <groupId>ch.admin.bit.jeap</groupId>
         <artifactId>jme-opensearch-example</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>1.0.1-SNAPSHOT</version>
     </parent>
 
 
     <artifactId>jme-opensearch-auth-scs</artifactId>
     <name>${project.artifactId}</name>
     <description>OAuth / OpenID Connect Server to use as a mock in tests and local development</description>
+
+    <properties>
+        <maven.javadoc.skip>true</maven.javadoc.skip>
+    </properties>
 
     <dependencies>
         <dependency>
@@ -48,17 +52,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
                 <executions>
-                    <execution>
-                        <id>empty-sources-jar</id>
-                        <phase>package</phase>
-                        <goals><goal>jar</goal></goals>
-                        <configuration>
-                            <classifier>sources</classifier>
-                            <classesDirectory>${project.basedir}</classesDirectory>
-                            <excludes><exclude>**/**</exclude></excludes>
-                            <forceCreation>true</forceCreation>
-                        </configuration>
-                    </execution>
                     <execution>
                         <id>empty-javadoc-jar</id>
                         <phase>package</phase>
