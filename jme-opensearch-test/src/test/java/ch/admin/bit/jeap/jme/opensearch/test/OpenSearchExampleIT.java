@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.List;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -63,8 +64,12 @@ class OpenSearchExampleIT extends BootServiceSpringIntegrationTestBase {
 
         String originId = created.path("searchItem.origin.id");
         String goodsDescription = created.path("searchItem.data.goods_description");
+        List<String> keywords = created.jsonPath().getList("searchItem.data.keywords", String.class);
+        List<?> customsChecks = created.jsonPath().getList("searchItem.data.customs_checks");
         assertThat(originId).isNotBlank();
         assertThat(goodsDescription).isNotBlank();
+        assertThat(keywords).isNotEmpty();
+        assertThat(customsChecks).isNotEmpty();
 
         String firstToken = goodsDescription.split(" ")[0];
         await().atMost(TIMEOUT).pollInterval(Duration.ofSeconds(1)).untilAsserted(() -> {
@@ -76,7 +81,12 @@ class OpenSearchExampleIT extends BootServiceSpringIntegrationTestBase {
                     .get("/api/transitdocuments");
 
             assertThat(inspection.statusCode()).isEqualTo(200);
-            assertThat(inspection.jsonPath().getList("origin.id", String.class)).contains(originId);
+            String createdDocument = "find { it.origin.id == '%s' }".formatted(originId);
+            assertThat(inspection.jsonPath().getMap(createdDocument)).isNotNull();
+            assertThat(inspection.jsonPath().getList(createdDocument + ".data.keywords", String.class))
+                    .isEqualTo(keywords);
+            assertThat(inspection.jsonPath().getList(createdDocument + ".data.customs_checks"))
+                    .isEqualTo(customsChecks);
         });
     }
 

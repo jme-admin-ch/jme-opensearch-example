@@ -39,6 +39,7 @@ class InspectionApplicationIT {
 
     private static final String DOCUMENT_ID = "integration-test-document";
     private static final String GOODS_DESCRIPTION = "Portable OpenSearch example";
+    private static final List<String> KEYWORDS = List.of("portable", "example");
 
     @Container
     static final OpensearchContainer<?> OPENSEARCH =
@@ -66,6 +67,7 @@ class InspectionApplicationIT {
                                 .properties("minor_version", field -> field.integer(integer -> integer))))
                         .properties("data", property -> property.object(data -> data
                                 .properties("transit_document_id", field -> field.keyword(keyword -> keyword))
+                                .properties("keywords", field -> field.keyword(keyword -> keyword))
                                 .properties("goods_description", field -> field.text(text -> text))))));
 
         openSearchClient.index(request -> request
@@ -80,9 +82,10 @@ class InspectionApplicationIT {
                                 "tenant", "TENANT1",
                                 "created", Instant.parse("2026-01-01T00:00:00Z").toString(),
                                 "modified", Instant.parse("2026-01-01T00:00:00Z").toString()),
-                        "search_item", Map.of("major_version", 1, "minor_version", 2),
+                        "search_item", Map.of("major_version", 1, "minor_version", 3),
                         "data", Map.of(
                                 "transit_document_id", DOCUMENT_ID,
+                                "keywords", KEYWORDS,
                                 "goods_description", GOODS_DESCRIPTION))));
     }
 
@@ -94,7 +97,9 @@ class InspectionApplicationIT {
         mockMvc.perform(get("/api/transitdocuments").param("goodsDescription", "portable"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].origin.id").value(DOCUMENT_ID));
+                .andExpect(jsonPath("$[0].origin.id").value(DOCUMENT_ID))
+                .andExpect(jsonPath("$[0].data.keywords[0]").value(KEYWORDS.get(0)))
+                .andExpect(jsonPath("$[0].data.keywords[1]").value(KEYWORDS.get(1)));
     }
 
     @TestConfiguration(proxyBeanMethods = false)

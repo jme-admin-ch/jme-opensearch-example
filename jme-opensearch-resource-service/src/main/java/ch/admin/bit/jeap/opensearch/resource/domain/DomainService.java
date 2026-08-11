@@ -127,7 +127,12 @@ public class DomainService implements SearchItemsProvider {
                 randomFrom(GOODS),
                 randomFrom(REMARKS),
                 "Text document",
-                randomFrom(FREETEXT));
+                randomFrom(FREETEXT),
+                List.of("transit", "customs"),
+                List.of(new JmeTransitDocumentDataV1.CustomsChecks(
+                        randomFrom(OFFICES),
+                        List.of("inspection", "cleared"),
+                        new JmeTransitDocumentDataV1.CustomsChecks.Details(List.of("A1", "B2")))));
     }
 
     private JmeTransitDecisionDataV1 createTransitDecisionDto() {
