@@ -79,27 +79,14 @@ services:
     ports:
       - "9200:9200"
     healthcheck:
-      test: [ "CMD", "curl", "-sf", "http://localhost:9200" ]
+      test:
+        - CMD-SHELL
+        - >-
+          curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s'
+          | grep -q '"discovered_cluster_manager"[[:space:]]*:[[:space:]]*true'
       interval: 10s
       timeout: 5s
       retries: 10
-
-  opensearch-init:
-    image: opensearchproject/opensearch:3.3.0
-    depends_on:
-      opensearch:
-        condition: service_healthy
-    entrypoint: [ "/bin/sh", "-c" ]
-    command: >
-      "curl -sf -X PUT http://opensearch:9200/_cluster/settings
-      -H 'Content-Type: application/json'
-      -d '{\"persistent\":{\"cluster.blocks.create_index\":null}}' &&
-      touch /tmp/opensearch-init-ready && tail -f /dev/null"
-    healthcheck:
-      test: [ "CMD-SHELL", "test -f /tmp/opensearch-init-ready" ]
-      interval: 3s
-      timeout: 3s
-      retries: 20
 
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:3.3.0
