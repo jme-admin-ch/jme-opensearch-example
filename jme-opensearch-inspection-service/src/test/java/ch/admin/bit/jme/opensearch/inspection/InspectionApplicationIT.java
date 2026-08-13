@@ -40,6 +40,9 @@ class InspectionApplicationIT {
     private static final String DOCUMENT_ID = "integration-test-document";
     private static final String GOODS_DESCRIPTION = "Portable OpenSearch example";
     private static final List<String> KEYWORDS = List.of("portable", "example");
+    private static final String CUSTOMS_OFFICE = "Basel";
+    private static final List<String> CUSTOMS_TAGS = List.of("inspection", "cleared");
+    private static final List<String> CUSTOMS_CODES = List.of("A1", "B2");
 
     @Container
     static final OpensearchContainer<?> OPENSEARCH =
@@ -68,6 +71,11 @@ class InspectionApplicationIT {
                         .properties("data", property -> property.object(data -> data
                                 .properties("transit_document_id", field -> field.keyword(keyword -> keyword))
                                 .properties("keywords", field -> field.keyword(keyword -> keyword))
+                                .properties("customs_checks", field -> field.nested(customsChecks -> customsChecks
+                                        .properties("office", nestedField -> nestedField.keyword(keyword -> keyword))
+                                        .properties("tags", nestedField -> nestedField.keyword(keyword -> keyword))
+                                        .properties("details", nestedField -> nestedField.object(details -> details
+                                                .properties("codes", detailField -> detailField.keyword(keyword -> keyword))))))
                                 .properties("goods_description", field -> field.text(text -> text))))));
 
         openSearchClient.index(request -> request
@@ -86,6 +94,10 @@ class InspectionApplicationIT {
                         "data", Map.of(
                                 "transit_document_id", DOCUMENT_ID,
                                 "keywords", KEYWORDS,
+                                "customs_checks", List.of(Map.of(
+                                        "office", CUSTOMS_OFFICE,
+                                        "tags", CUSTOMS_TAGS,
+                                        "details", Map.of("codes", CUSTOMS_CODES))),
                                 "goods_description", GOODS_DESCRIPTION))));
     }
 
@@ -99,7 +111,25 @@ class InspectionApplicationIT {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].origin.id").value(DOCUMENT_ID))
                 .andExpect(jsonPath("$[0].data.keywords[0]").value(KEYWORDS.get(0)))
-                .andExpect(jsonPath("$[0].data.keywords[1]").value(KEYWORDS.get(1)));
+                .andExpect(jsonPath("$[0].data.keywords[1]").value(KEYWORDS.get(1)))
+                .andExpect(jsonPath("$[0].data.customs_checks[0].office").value(CUSTOMS_OFFICE))
+                .andExpect(jsonPath("$[0].data.customs_checks[0].tags[0]").value(CUSTOMS_TAGS.get(0)))
+                .andExpect(jsonPath("$[0].data.customs_checks[0].details.codes[0]").value(CUSTOMS_CODES.get(0)));
+    }
+
+    @Test
+    void searchesEveryCollectionFieldShape() throws Exception {
+        assertSearch("/api/transitdocuments/by-keyword", "keyword", KEYWORDS.get(0));
+        assertSearch("/api/transitdocuments/by-customs-office", "office", CUSTOMS_OFFICE);
+        assertSearch("/api/transitdocuments/by-customs-tag", "tag", CUSTOMS_TAGS.get(0));
+        assertSearch("/api/transitdocuments/by-customs-code", "code", CUSTOMS_CODES.get(0));
+    }
+
+    private void assertSearch(String path, String parameter, String value) throws Exception {
+        mockMvc.perform(get(path).param(parameter, value))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].origin.id").value(DOCUMENT_ID));
     }
 
     @TestConfiguration(proxyBeanMethods = false)

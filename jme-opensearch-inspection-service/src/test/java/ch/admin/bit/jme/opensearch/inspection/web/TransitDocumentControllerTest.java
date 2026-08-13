@@ -7,9 +7,13 @@ import ch.admin.bit.jeap.opensearch.indextype.IndexType;
 import ch.admin.bit.jme.opensearch.index.jme.transitdocument.JmeTransitDocumentDataV1;
 import ch.admin.bit.jme.opensearch.index.jme.transitdocument.JmeTransitDocumentIndexTypeV1;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.opensearch.client.opensearch._types.query_dsl.PrefixQuery;
 import org.opensearch.client.opensearch._types.query_dsl.Query;
+import org.opensearch.client.opensearch._types.query_dsl.TermQuery;
 import org.opensearch.client.opensearch.core.SearchRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration;
@@ -20,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import static ch.admin.bit.jme.opensearch.inspection.web.TestData.BP1;
 import static ch.admin.bit.jme.opensearch.inspection.web.TestData.documentItem;
@@ -80,6 +85,49 @@ class TransitDocumentControllerTest {
         customizerCaptor.getValue().accept(builder);
         SearchRequest req = builder.query(Query.of(q -> q.matchAll(m -> m))).build();
         assertThat(req.size()).isEqualTo(20);
+    }
+
+    @ParameterizedTest
+    @MethodSource("termQueryRequests")
+    void termQueryEndpoints_callSearchWithExpectedQuery(String path, String parameter, String value,
+                                                        String expectedField, boolean nested) throws Exception {
+        when(searchItemClient.searchMultiVersionWithUserAuth(
+                eq(List.of(INDEX_TYPE)), any(Query.class), any(Consumer.class)))
+                .thenReturn(List.of(documentItem("doc-1", BP1)));
+
+        mockMvc.perform(get(path).param(parameter, value).accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].origin.id").value("doc-1"));
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(searchItemClient).searchMultiVersionWithUserAuth(
+                eq(List.of(INDEX_TYPE)), queryCaptor.capture(), any(Consumer.class));
+
+        Query query = queryCaptor.getValue();
+        TermQuery term;
+        if (nested) {
+            assertThat(query.isNested()).isTrue();
+            assertThat(query.nested().path()).isEqualTo("data.customs_checks");
+            assertThat(query.nested().query().isTerm()).isTrue();
+            term = query.nested().query().term();
+        } else {
+            assertThat(query.isTerm()).isTrue();
+            term = query.term();
+        }
+        assertThat(term.field()).isEqualTo(expectedField);
+        assertThat(term.value().stringValue()).isEqualTo(value);
+    }
+
+    private static Stream<Arguments> termQueryRequests() {
+        return Stream.of(
+                Arguments.of("/api/transitdocuments/by-keyword", "keyword", "transit",
+                        "data.keywords", false),
+                Arguments.of("/api/transitdocuments/by-customs-office", "office", "Basel",
+                        "data.customs_checks.office", true),
+                Arguments.of("/api/transitdocuments/by-customs-tag", "tag", "inspection",
+                        "data.customs_checks.tags", true),
+                Arguments.of("/api/transitdocuments/by-customs-code", "code", "A1",
+                        "data.customs_checks.details.codes", true));
     }
 
     @Test

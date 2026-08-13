@@ -129,10 +129,15 @@ public class DomainService implements SearchItemsProvider {
                 "Text document",
                 randomFrom(FREETEXT),
                 List.of("transit", "customs"),
-                List.of(new JmeTransitDocumentDataV1.CustomsChecks(
-                        randomFrom(OFFICES),
-                        List.of("inspection", "cleared"),
-                        new JmeTransitDocumentDataV1.CustomsChecks.Details(List.of("A1", "B2")))));
+                List.of(
+                        new JmeTransitDocumentDataV1.CustomsChecks(
+                                "Basel",
+                                List.of("inspection", "cleared"),
+                                new JmeTransitDocumentDataV1.CustomsChecks.Details(List.of("A1", "B2"))),
+                        new JmeTransitDocumentDataV1.CustomsChecks(
+                                "Zurich",
+                                List.of("documentary"),
+                                new JmeTransitDocumentDataV1.CustomsChecks.Details(List.of("C3")))));
     }
 
     private JmeTransitDecisionDataV1 createTransitDecisionDto() {

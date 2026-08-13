@@ -66,10 +66,18 @@ class OpenSearchExampleIT extends BootServiceSpringIntegrationTestBase {
         String goodsDescription = created.path("searchItem.data.goods_description");
         List<String> keywords = created.jsonPath().getList("searchItem.data.keywords", String.class);
         List<?> customsChecks = created.jsonPath().getList("searchItem.data.customs_checks");
+        String customsOffice = created.path("searchItem.data.customs_checks[0].office");
+        List<String> customsTags = created.jsonPath()
+                .getList("searchItem.data.customs_checks[0].tags", String.class);
+        List<String> customsCodes = created.jsonPath()
+                .getList("searchItem.data.customs_checks[0].details.codes", String.class);
         assertThat(originId).isNotBlank();
         assertThat(goodsDescription).isNotBlank();
         assertThat(keywords).isNotEmpty();
-        assertThat(customsChecks).isNotEmpty();
+        assertThat(customsChecks).hasSize(2);
+        assertThat(customsOffice).isNotBlank();
+        assertThat(customsTags).isNotEmpty();
+        assertThat(customsCodes).isNotEmpty();
 
         String firstToken = goodsDescription.split(" ")[0];
         await().atMost(TIMEOUT).pollInterval(Duration.ofSeconds(1)).untilAsserted(() -> {
@@ -88,6 +96,11 @@ class OpenSearchExampleIT extends BootServiceSpringIntegrationTestBase {
             assertThat(inspection.jsonPath().getList(createdDocument + ".data.customs_checks"))
                     .isEqualTo(customsChecks);
         });
+
+        assertTransitDocumentSearch("/api/transitdocuments/by-keyword", "keyword", keywords.getFirst(), originId);
+        assertTransitDocumentSearch("/api/transitdocuments/by-customs-office", "office", customsOffice, originId);
+        assertTransitDocumentSearch("/api/transitdocuments/by-customs-tag", "tag", customsTags.getFirst(), originId);
+        assertTransitDocumentSearch("/api/transitdocuments/by-customs-code", "code", customsCodes.getFirst(), originId);
     }
 
     @Test
@@ -116,5 +129,17 @@ class OpenSearchExampleIT extends BootServiceSpringIntegrationTestBase {
             assertThat(inspection.statusCode()).isEqualTo(200);
             assertThat(inspection.jsonPath().getList("origin.id", String.class)).contains(originId);
         });
+    }
+
+    private static void assertTransitDocumentSearch(String path, String parameter, String value, String originId) {
+        Response response = given()
+                .baseUri(INSPECTION_BASE_URL)
+                .auth().oauth2(accessToken)
+                .queryParam(parameter, value)
+                .when()
+                .get(path);
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.jsonPath().getList("origin.id", String.class)).contains(originId);
     }
 }

@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 
 - Demonstrate top-level, nested and deeply nested OpenSearch collection fields in the transit-document flow.
+- Provide authorization-aware searches for scalar, collection and nested transit-document fields.
 
 ## [1.0.1] - 2026-08-11
 
