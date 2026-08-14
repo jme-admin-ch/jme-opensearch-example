@@ -54,15 +54,24 @@ condition and remote SearchItems endpoint. Index types and mappings are generate
 
 The transit-document flow demonstrates each generated field shape:
 
-| Mapping field | OpenSearch shape | Generated Java component |
-| --- | --- | --- |
-| `goods_description` | Scalar | `String` |
-| `keywords` | Scalar collection | `List<String>` |
-| `customs_checks` | Nested collection | `List<CustomsChecks>` |
-| `customs_checks.office` | Nested scalar | `String` |
-| `customs_checks.tags` | Nested scalar collection | `List<String>` |
-| `customs_checks.details` | Single nested object | `Details` |
-| `customs_checks.details.codes` | Scalar collection in a single nested object | `List<String>` |
+| Mapping field                         | OpenSearch shape                            | Generated Java component |
+|:--------------------------------------|:--------------------------------------------|:-------------------------|
+| `goods_description`                   | Scalar                                      | `String`                 |
+| `keywords`                            | Scalar collection                           | `List<String>`           |
+| `customs_checks`                      | Nested collection                           | `List<CustomsChecks>`    |
+| `customs_checks.office`               | Nested scalar                               | `String`                 |
+| `customs_checks.tags`                 | Nested scalar collection                    | `List<String>`           |
+| `customs_checks.details`              | Single nested object                        | `Details`                |
+| `customs_checks.details.codes`        | Scalar collection in a single nested object | `List<String>`           |
+
+The source mapping is defined in the index type registry at
+[`index-types/jme/jmetransitdocument/JmeTransitDocument_mapping_v1_3.json`](https://github.com/jme-admin-ch/jme-index-type-registry/blob/main/index-types/jme/jmetransitdocument/JmeTransitDocument_mapping_v1_3.json).
+The generated Java object is the
+`ch/admin/bit/jme/opensearch/index/jme/transitdocument/JmeTransitDocumentDataV1.java` entry in the
+`jme-transit-document-v1-1.3-sources.jar` artifact. Download the sources with
+`./mvnw dependency:get -Dartifact=ch.admin.bit.jeap.jme.indextype.jme:jme-transit-document-v1:1.3:jar:sources`.
+The generated source is then available in
+`~/.m2/repository/ch/admin/bit/jeap/jme/indextype/jme/jme-transit-document-v1/1.3/jme-transit-document-v1-1.3-sources.jar`.
 
 The end-to-end test verifies that these values survive resource serialization, indexing, typed search-result
 deserialization and field-specific OpenSearch queries.

@@ -53,7 +53,7 @@ Apache License Version 2.0
  * ch.admin.bit.jeap.jme.indextype.jme:jme-diagram-v1 - [ch.admin.bit.jeap.jme.indextype.jme:jme-diagram-v1](https://github.com/jme-admin-ch/jme-index-type-registry/tree/master)
  * ch.admin.bit.jeap.jme.indextype.jme:jme-transit-decision-v1 - [ch.admin.bit.jeap.jme.indextype.jme:jme-transit-decision-v1](https://github.com/jme-admin-ch/jme-index-type-registry/tree/master)
  * ch.admin.bit.jeap.jme.indextype.jme:jme-transit-decision-v2 - [ch.admin.bit.jeap.jme.indextype.jme:jme-transit-decision-v2](https://github.com/jme-admin-ch/jme-index-type-registry/tree/master)
- * ch.admin.bit.jeap.jme.indextype.jme:jme-transit-document-v1 - ch.admin.bit.jeap.jme.indextype.jme:jme-transit-document-v1
+ * ch.admin.bit.jeap.jme.indextype.jme:jme-transit-document-v1 - [ch.admin.bit.jeap.jme.indextype.jme:jme-transit-document-v1](https://github.com/jme-admin-ch/jme-index-type-registry/tree/main)
  * ch.admin.bit.jeap.jme.messagetype.jme:jme-create-transit-document-command - [ch.admin.bit.jeap.jme.messagetype.jme:jme-create-transit-document-command](https://github.com/jme-admin-ch/jme-message-type-registry/tree/main)
  * ch.admin.bit.jeap.jme.messagetype.jme:jme-document-created-event - [ch.admin.bit.jeap.jme.messagetype.jme:jme-document-created-event](https://github.com/jme-admin-ch/jme-message-type-registry/tree/main)
  * ch.admin.bit.jeap.jme.messagetype.jme:jme-messaging-common - [ch.admin.bit.jeap.jme.messagetype.jme:jme-messaging-common](https://github.com/jme-admin-ch/jme-message-type-registry/tree/main)
