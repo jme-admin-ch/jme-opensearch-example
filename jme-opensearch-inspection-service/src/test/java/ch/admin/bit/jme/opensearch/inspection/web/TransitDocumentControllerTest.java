@@ -56,7 +56,7 @@ class TransitDocumentControllerTest {
     // ===== LIST: GET /api/transitdocuments?goodsDescription=... =============================
 
     @Test
-    void list_withGoodsDescriptionParam_callsSearchWithUserAuth_withPrefixQuerySize20AndNewestFirst() throws Exception {
+    void list_withGoodsDescriptionParam_callsSearchWithUserAuth_withPrefixQueryAndDefaultPage() throws Exception {
         SearchItemTyped<JmeTransitDocumentDataV1> item = documentItem("doc-1", BP1);
         when(searchItemClient.searchMultiVersionWithUserAuth(eq(List.of(INDEX_TYPE)), any(Query.class), any(Consumer.class)))
                 .thenReturn(List.of(item));
@@ -83,11 +83,7 @@ class TransitDocumentControllerTest {
                 .as("V3: prefix must be case-insensitive — 'F' must match 'Food'/'Furniture' tokens")
                 .isTrue();
 
-        SearchRequest.Builder builder = new SearchRequest.Builder().index("dummy");
-        customizerCaptor.getValue().accept(builder);
-        SearchRequest req = builder.query(Query.of(q -> q.matchAll(m -> m))).build();
-        assertThat(req.size()).isEqualTo(20);
-        assertNewestFirst(req);
+        assertDefaultPageNewestFirst(capturedSearchRequest(customizerCaptor.getValue()));
     }
 
     @ParameterizedTest
@@ -108,9 +104,7 @@ class TransitDocumentControllerTest {
         verify(searchItemClient).searchMultiVersionWithUserAuth(
                 eq(List.of(INDEX_TYPE)), queryCaptor.capture(), customizerCaptor.capture());
 
-        SearchRequest.Builder builder = new SearchRequest.Builder().index("dummy");
-        customizerCaptor.getValue().accept(builder);
-        assertNewestFirst(builder.query(Query.of(q -> q.matchAll(m -> m))).build());
+        assertDefaultPageNewestFirst(capturedSearchRequest(customizerCaptor.getValue()));
 
         Query query = queryCaptor.getValue();
         TermQuery term;
@@ -158,16 +152,51 @@ class TransitDocumentControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+
+    @Test
+    void list_withPageableParams_forwardsPagingAndSortingToTheSearchRequest() throws Exception {
+        when(searchItemClient.searchMultiVersionWithUserAuth(eq(List.of(INDEX_TYPE)), any(Query.class), any(Consumer.class)))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/transitdocuments")
+                        .param("goodsDescription", "F")
+                        .param("page", "2")
+                        .param("size", "5")
+                        .param("sort", "data.goods_description,asc"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<Consumer<SearchRequest.Builder>> customizerCaptor =
+                ArgumentCaptor.forClass(Consumer.class);
+        verify(searchItemClient).searchMultiVersionWithUserAuth(
+                eq(List.of(INDEX_TYPE)), any(Query.class), customizerCaptor.capture());
+
+        SearchRequest req = capturedSearchRequest(customizerCaptor.getValue());
+        assertThat(req.from()).isEqualTo(10);
+        assertThat(req.size()).isEqualTo(5);
+        assertSortedBy(req, "data.goods_description", SortOrder.Asc);
+    }
     /**
-     * The result is capped at 20 hits, so the search must impose an explicit order. Without it
+     * The result is capped at a page size, so the search must impose an explicit order. Without it
      * OpenSearch returns an arbitrary slice of the matches and a freshly indexed item can stay
-     * invisible forever once more than 20 documents match.
+     * invisible forever once more documents match than fit on a page.
      */
-    private static void assertNewestFirst(SearchRequest request) {
+    private static void assertDefaultPageNewestFirst(SearchRequest request) {
+        assertThat(request.from()).isZero();
+        assertThat(request.size()).isEqualTo(20);
+        assertSortedBy(request, "origin.created", SortOrder.Desc);
+    }
+
+    private static void assertSortedBy(SearchRequest request, String field, SortOrder order) {
         assertThat(request.sort()).hasSize(1);
         FieldSort sort = request.sort().getFirst().field();
         assertThat(sort).as("search must be sorted by a field").isNotNull();
-        assertThat(sort.field()).isEqualTo("origin.created");
-        assertThat(sort.order()).isEqualTo(SortOrder.Desc);
+        assertThat(sort.field()).isEqualTo(field);
+        assertThat(sort.order()).isEqualTo(order);
+    }
+
+    private static SearchRequest capturedSearchRequest(Consumer<SearchRequest.Builder> customizer) {
+        SearchRequest.Builder builder = new SearchRequest.Builder().index("dummy");
+        customizer.accept(builder);
+        return builder.query(Query.of(q -> q.matchAll(m -> m))).build();
     }
 }

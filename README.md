@@ -240,18 +240,26 @@ The misspelled `transitdescisions` path is retained for compatibility with the o
 
 | Method and path | Behavior |
 | --- | --- |
-| `GET /api/transitdocuments?goodsDescription=...` | Returns the 20 most recently created authorized V1 transit documents whose `data.goods_description` contains a token with the given prefix. |
+| `GET /api/transitdocuments?goodsDescription=...` | Returns a page of authorized V1 transit documents whose `data.goods_description` contains a token with the given prefix. |
 | `GET /api/transitdocuments/by-keyword?keyword=...` | Uses a term query on the scalar collection `data.keywords`. |
 | `GET /api/transitdocuments/by-customs-office?office=...` | Uses a nested term query on the scalar `data.customs_checks.office`. |
 | `GET /api/transitdocuments/by-customs-tag?tag=...` | Uses a nested term query on the scalar collection `data.customs_checks.tags`. |
 | `GET /api/transitdocuments/by-customs-code?code=...` | Uses a nested term query through the single `details` object to `data.customs_checks.details.codes`. |
-| `GET /api/transitdecisions?decidedBy=...` | Returns the 20 most recently created authorized V1 or V2 transit decisions whose `data.decided_by` value starts with the given prefix. |
+| `GET /api/transitdecisions?decidedBy=...` | Returns a page of authorized V1 or V2 transit decisions whose `data.decided_by` value starts with the given prefix. |
 | `GET /api/decrees?originId=...` | Returns the first authorized decree whose `origin.id` starts with the given value, or HTTP 404. |
 | `GET /api/decreedocuments?originId=...` | Returns the first authorized decree document whose `origin.id` starts with the given value, or HTTP 404. |
 
-All transit-document and transit-decision searches return at most 20 hits, sorted by `origin.created` descending.
-An explicit sort is required: the searches cap the result size, and without one OpenSearch returns an arbitrary slice
-of the matches, so a freshly indexed item can stay invisible for good once more than 20 documents match.
+#### Paging and sorting
+
+The transit-document and transit-decision searches take a Spring Data `Pageable`, so a caller can add `page`, `size`
+and `sort` to any of them, for example `?goodsDescription=F&page=1&size=50&sort=data.goods_description,asc`. Sort
+properties are OpenSearch field names, and the field has to be mapped as sortable in the index type. Paging uses
+`from`/`size` and is therefore bounded by the index's `index.max_result_window` (10'000 by default).
+
+Without a `sort` parameter the searches return the 20 most recently created matches, i.e. `origin.created` descending.
+An explicit order matters: the result is capped at a page size, and without a sort OpenSearch returns an arbitrary
+slice of the matches, so a freshly indexed item can stay invisible for good once more documents match than fit on a
+page.
 
 All inspection parameters are mandatory; omitting one returns HTTP 400. Prefix queries are case-insensitive.
 `data.decided_by` is mapped as a `keyword`, so the prefix applies to the complete field value. `data.goods_description`

@@ -26,6 +26,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!-- Provides Pageable/Sort and auto-configures their Spring MVC argument resolver, so the
+             search endpoints can take paging and sorting from the caller. Pulls in
+             spring-data-commons; no Spring Data repositories are used. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-data-commons</artifactId>
+        </dependency>
         <dependency>
             <groupId>ch.admin.bit.jeap</groupId>
             <artifactId>jeap-spring-boot-security-starter</artifactId>
