@@ -10,6 +10,8 @@ import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionI
 import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionIndexTypeV2;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.opensearch.client.opensearch._types.FieldSort;
+import org.opensearch.client.opensearch._types.SortOrder;
 import org.opensearch.client.opensearch._types.query_dsl.PrefixQuery;
 import org.opensearch.client.opensearch._types.query_dsl.Query;
 import org.opensearch.client.opensearch.core.SearchRequest;
@@ -53,7 +55,7 @@ class TransitDecisionControllerTest {
     // ===== LIST: GET /api/transitdecisions?decidedBy=... ===================================
 
     @Test
-    void list_withDecidedByParam_callsSearchWithUserAuth_withPrefixQueryAndSize20() throws Exception {
+    void list_withDecidedByParam_callsSearchWithUserAuth_withPrefixQuerySize20AndNewestFirst() throws Exception {
         SearchItemTyped<JmeTransitDecisionDataV1> item = decisionItem("dec-1", BP1);
         when(searchItemClient.searchMultiVersionWithUserAuth(eq(List.of(INDEX_TYPE, INDEX_TYPE_V2)), any(Query.class), any(Consumer.class)))
                 .thenReturn(List.of(item));
@@ -84,6 +86,7 @@ class TransitDecisionControllerTest {
         customizerCaptor.getValue().accept(builder);
         SearchRequest req = builder.query(Query.of(q -> q.matchAll(m -> m))).build();
         assertThat(req.size()).isEqualTo(20);
+        assertNewestFirst(req);
     }
 
     @Test
@@ -140,6 +143,19 @@ class TransitDecisionControllerTest {
 
         mockMvc.perform(get("/api/transitdecisions").param("decidedBy", "alice"))
                 .andExpect(status().isForbidden());
+    }
+
+    /**
+     * The result is capped at 20 hits, so the search must impose an explicit order. Without it
+     * OpenSearch returns an arbitrary slice of the matches and a freshly indexed item can stay
+     * invisible forever once more than 20 documents match.
+     */
+    private static void assertNewestFirst(SearchRequest request) {
+        assertThat(request.sort()).hasSize(1);
+        FieldSort sort = request.sort().getFirst().field();
+        assertThat(sort).as("search must be sorted by a field").isNotNull();
+        assertThat(sort.field()).isEqualTo("origin.created");
+        assertThat(sort.order()).isEqualTo(SortOrder.Desc);
     }
 
 }

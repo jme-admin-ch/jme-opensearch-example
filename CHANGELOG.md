@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Sort the transit-document and transit-decision inspection searches by `origin.created` descending. The searches cap
+  the result at 20 hits; without an explicit sort OpenSearch returned an arbitrary slice of the matches, so a freshly
+  indexed item could stay invisible for good once more than 20 documents matched the query.
+
 ## [1.1.0] - 2026-08-14
 
 ### Added

@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.opensearch.client.opensearch._types.SortOrder;
 import org.opensearch.client.opensearch._types.query_dsl.Query;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,6 +27,7 @@ public class TransitDocumentController {
     private static final int PAGE_SIZE = 20;
     private static final IndexType<JmeTransitDocumentDataV1> INDEX_TYPE =
             JmeTransitDocumentIndexTypeV1.INSTANCE;
+    private static final String CREATED_FIELD = "origin.created";
     private static final String GOODS_DESCRIPTION_FIELD = "data.goods_description";
     private static final String KEYWORDS_FIELD = "data.keywords";
     private static final String CUSTOMS_CHECKS_PATH = "data.customs_checks";
@@ -37,7 +39,7 @@ public class TransitDocumentController {
 
     // No pre-authorization here on the endpoint for this example as we want to show that
     // the searchItemClient can check a user's authorization to access search items by itself.
-    @Operation(summary = "List up to 20 transit documents whose 'goods_description' token starts with the given value (case-insensitive).",
+    @Operation(summary = "List the 20 most recently created transit documents whose 'goods_description' token starts with the given value (case-insensitive).",
             security = {@SecurityRequirement(name = "OIDC")})
     @GetMapping
     public List<SearchItemView> list(
@@ -50,28 +52,28 @@ public class TransitDocumentController {
         return search(prefix);
     }
 
-    @Operation(summary = "Find transit documents containing the given keyword.",
+    @Operation(summary = "Find the 20 most recently created transit documents containing the given keyword.",
             security = {@SecurityRequirement(name = "OIDC")})
     @GetMapping("/by-keyword")
     public List<SearchItemView> byKeyword(@RequestParam String keyword) {
         return search(term(KEYWORDS_FIELD, keyword));
     }
 
-    @Operation(summary = "Find transit documents with a customs check for the given office.",
+    @Operation(summary = "Find the 20 most recently created transit documents with a customs check for the given office.",
             security = {@SecurityRequirement(name = "OIDC")})
     @GetMapping("/by-customs-office")
     public List<SearchItemView> byCustomsOffice(@RequestParam String office) {
         return search(nestedTerm(CUSTOMS_OFFICE_FIELD, office));
     }
 
-    @Operation(summary = "Find transit documents with a customs check containing the given tag.",
+    @Operation(summary = "Find the 20 most recently created transit documents with a customs check containing the given tag.",
             security = {@SecurityRequirement(name = "OIDC")})
     @GetMapping("/by-customs-tag")
     public List<SearchItemView> byCustomsTag(@RequestParam String tag) {
         return search(nestedTerm(CUSTOMS_TAGS_FIELD, tag));
     }
 
-    @Operation(summary = "Find transit documents with a customs-check detail containing the given code.",
+    @Operation(summary = "Find the 20 most recently created transit documents with a customs-check detail containing the given code.",
             security = {@SecurityRequirement(name = "OIDC")})
     @GetMapping("/by-customs-code")
     public List<SearchItemView> byCustomsCode(@RequestParam String code) {
@@ -91,10 +93,14 @@ public class TransitDocumentController {
     }
 
     private List<SearchItemView> search(Query query) {
+        // Sort newest first: the result is capped at PAGE_SIZE, so without an explicit sort
+        // OpenSearch returns an arbitrary slice of the matches and recently indexed items can
+        // stay invisible forever once more than PAGE_SIZE documents match.
         return searchItemClient.searchMultiVersionWithUserAuth(
                 List.of(INDEX_TYPE),
                 query,
                 b -> b.size(PAGE_SIZE)
+                        .sort(s -> s.field(f -> f.field(CREATED_FIELD).order(SortOrder.Desc)))
         );
     }
 }

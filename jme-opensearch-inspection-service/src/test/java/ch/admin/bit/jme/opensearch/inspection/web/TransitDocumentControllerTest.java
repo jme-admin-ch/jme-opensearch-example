@@ -11,6 +11,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
+import org.opensearch.client.opensearch._types.FieldSort;
+import org.opensearch.client.opensearch._types.SortOrder;
 import org.opensearch.client.opensearch._types.query_dsl.PrefixQuery;
 import org.opensearch.client.opensearch._types.query_dsl.Query;
 import org.opensearch.client.opensearch._types.query_dsl.TermQuery;
@@ -54,7 +56,7 @@ class TransitDocumentControllerTest {
     // ===== LIST: GET /api/transitdocuments?goodsDescription=... =============================
 
     @Test
-    void list_withGoodsDescriptionParam_callsSearchWithUserAuth_withPrefixQuery() throws Exception {
+    void list_withGoodsDescriptionParam_callsSearchWithUserAuth_withPrefixQuerySize20AndNewestFirst() throws Exception {
         SearchItemTyped<JmeTransitDocumentDataV1> item = documentItem("doc-1", BP1);
         when(searchItemClient.searchMultiVersionWithUserAuth(eq(List.of(INDEX_TYPE)), any(Query.class), any(Consumer.class)))
                 .thenReturn(List.of(item));
@@ -85,6 +87,7 @@ class TransitDocumentControllerTest {
         customizerCaptor.getValue().accept(builder);
         SearchRequest req = builder.query(Query.of(q -> q.matchAll(m -> m))).build();
         assertThat(req.size()).isEqualTo(20);
+        assertNewestFirst(req);
     }
 
     @ParameterizedTest
@@ -100,8 +103,14 @@ class TransitDocumentControllerTest {
                 .andExpect(jsonPath("$[0].origin.id").value("doc-1"));
 
         ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Consumer<SearchRequest.Builder>> customizerCaptor =
+                ArgumentCaptor.forClass(Consumer.class);
         verify(searchItemClient).searchMultiVersionWithUserAuth(
-                eq(List.of(INDEX_TYPE)), queryCaptor.capture(), any(Consumer.class));
+                eq(List.of(INDEX_TYPE)), queryCaptor.capture(), customizerCaptor.capture());
+
+        SearchRequest.Builder builder = new SearchRequest.Builder().index("dummy");
+        customizerCaptor.getValue().accept(builder);
+        assertNewestFirst(builder.query(Query.of(q -> q.matchAll(m -> m))).build());
 
         Query query = queryCaptor.getValue();
         TermQuery term;
@@ -147,5 +156,18 @@ class TransitDocumentControllerTest {
 
         mockMvc.perform(get("/api/transitdocuments").param("goodsDescription", "F"))
                 .andExpect(status().isForbidden());
+    }
+
+    /**
+     * The result is capped at 20 hits, so the search must impose an explicit order. Without it
+     * OpenSearch returns an arbitrary slice of the matches and a freshly indexed item can stay
+     * invisible forever once more than 20 documents match.
+     */
+    private static void assertNewestFirst(SearchRequest request) {
+        assertThat(request.sort()).hasSize(1);
+        FieldSort sort = request.sort().getFirst().field();
+        assertThat(sort).as("search must be sorted by a field").isNotNull();
+        assertThat(sort.field()).isEqualTo("origin.created");
+        assertThat(sort.order()).isEqualTo(SortOrder.Desc);
     }
 }
