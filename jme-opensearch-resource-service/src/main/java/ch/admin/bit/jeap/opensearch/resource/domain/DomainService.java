@@ -52,6 +52,7 @@ public class DomainService implements SearchItemsProvider {
     private static final List<String> URLS = List.of(
             "https://github.com/jme-admin-ch/jme-opensearch-example", "https://www.google.com/", "https://hello.ch"
     );
+    private static final String TRANSIT_DECISION_INDEX_TYPE = "JmeTransitDecision";
     private static final Random RANDOM = new Random();
 
     private final DomainRepository domainRepository;
@@ -93,7 +94,7 @@ public class DomainService implements SearchItemsProvider {
                 searchItem
         );
 
-        domainRepository.saveSearchItemContainer("JmeTransitDecision", searchItemOrigin.id(), null, searchItemContainer);
+        domainRepository.saveSearchItemContainer(TRANSIT_DECISION_INDEX_TYPE, searchItemOrigin.id(), null, searchItemContainer);
 
         messagePublisher.transitDecisionCreated(transitDecision);
 
@@ -112,7 +113,7 @@ public class DomainService implements SearchItemsProvider {
                 searchItem
         );
 
-        domainRepository.saveSearchItemContainer("JmeTransitDecision", searchItemOrigin.id(), null, searchItemContainer);
+        domainRepository.saveSearchItemContainer(TRANSIT_DECISION_INDEX_TYPE, searchItemOrigin.id(), null, searchItemContainer);
 
         messagePublisher.transitDecisionCreatedV2(transitDecision);
 
@@ -131,7 +132,7 @@ public class DomainService implements SearchItemsProvider {
                 searchItem
         );
 
-        domainRepository.saveSearchItemContainer("JmeTransitDecision", searchItemOrigin.id(), null, searchItemContainer);
+        domainRepository.saveSearchItemContainer(TRANSIT_DECISION_INDEX_TYPE, searchItemOrigin.id(), null, searchItemContainer);
 
         messagePublisher.transitDecisionCreatedV3(transitDecision);
 
