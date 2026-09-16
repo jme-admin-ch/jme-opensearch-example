@@ -76,6 +76,17 @@ The generated source is then available in
 The end-to-end test verifies that these values survive resource serialization, indexing, typed search-result
 deserialization and field-specific OpenSearch queries.
 
+The transit-decision V3 flow demonstrates native OpenSearch analysis settings supplied by an index type. Its custom
+analyzer maps `&` to `and`, splits text on whitespace and hyphens, lowercases and folds accents, and removes `and` as a
+stopword. Consequently, the remark `Café & Müller-AG` is indexed as the tokens `cafe`, `muller`, `ag`. A custom
+normalizer makes the keyword `Peter Müller` searchable as `peter muller`. OpenSearch still returns the original accented
+values from `_source`.
+
+These settings are defined in the index type registry's
+[`JmeTransitDecision_mapping_v3_0.json`](https://github.com/jme-admin-ch/jme-index-type-registry/blob/main/index-types/jme/jmetransitdecision/JmeTransitDecision_mapping_v3_0.json).
+Analysis changes require a new index-type major version because existing documents must be reindexed with the new
+analysis chain.
+
 ## Prerequisites
 
 - Java Development Kit 25
@@ -139,12 +150,11 @@ Local endpoints:
 
 ### Try The Example
 
-Create a transit decision:
+Create a V3 transit decision with analyzed example values:
 
 ```bash
 DECISION=$(curl --fail --silent --request POST \
-  http://localhost:8581/jme-opensearch-resource-service/api/transitdescisions)
-DECIDED_BY=$(jq --raw-output '.searchItem.data.decided_by' <<< "$DECISION")
+  http://localhost:8581/jme-opensearch-resource-service/api/v3/transitdescisions)
 jq . <<< "$DECISION"
 ```
 
@@ -206,7 +216,12 @@ After the Kafka message has been processed, search for the indexed decision:
 ```bash
 curl --fail --silent --get \
   http://localhost:8582/jme-opensearch-inspection-service/api/transitdecisions \
-  --data-urlencode "decidedBy=$DECIDED_BY" \
+  --data-urlencode 'decidedBy=peter muller' \
+  --header "Authorization: Bearer $TOKEN" | jq .
+
+curl --fail --silent --get \
+  http://localhost:8582/jme-opensearch-inspection-service/api/transitdecisions/by-remarks \
+  --data-urlencode 'remarks=cafe muller' \
   --header "Authorization: Bearer $TOKEN" | jq .
 ```
 

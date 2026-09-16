@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2026-09-16
+
+### Added
+
+- Demonstrate custom OpenSearch analyzers, normalizers, tokenizers, token filters and character filters with transit
+  decision V3.
+- Verify accent folding, case normalization and preservation of the original source values end to end.
+
+### Changed
+
+- Use jEAP parent 41.5.0 and OpenSearch index writer 6.2.1.
+
 ## [1.1.1] - 2026-09-03
 
 ### Added

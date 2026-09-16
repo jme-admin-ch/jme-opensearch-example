@@ -6,8 +6,10 @@ import ch.admin.bit.jeap.opensearch.searchitem.api.SearchItemsProvider;
 import ch.admin.bit.jeap.opensearch.searchitem.model.SearchItemContainer;
 import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionDataV1;
 import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionDataV2;
+import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionDataV3;
 import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionIndexTypeV1;
 import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionIndexTypeV2;
+import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionIndexTypeV3;
 import ch.admin.bit.jme.opensearch.index.jme.transitdocument.JmeTransitDocumentDataV1;
 import ch.admin.bit.jme.opensearch.index.jme.transitdocument.JmeTransitDocumentIndexTypeV1;
 import ch.admin.bit.jme.transit.JmeTransitDecisionStatus;
@@ -117,6 +119,25 @@ public class DomainService implements SearchItemsProvider {
         return searchItemContainer;
     }
 
+    public SearchItemContainer createAndPublishTransitDecisionV3() {
+        JmeTransitDecisionDataV3 transitDecision = createTransitDecisionDtoV3();
+        Origin searchItemOrigin = createOrigin(transitDecision.transitDecisionIdentifier());
+
+        SearchItem<JmeTransitDecisionDataV3> searchItem = new SearchItem<>(searchItemOrigin, transitDecision);
+
+        SearchItemContainer searchItemContainer = new SearchItemContainer(
+                3,
+                JmeTransitDecisionIndexTypeV3.INSTANCE.minorVersion(),
+                searchItem
+        );
+
+        domainRepository.saveSearchItemContainer("JmeTransitDecision", searchItemOrigin.id(), null, searchItemContainer);
+
+        messagePublisher.transitDecisionCreatedV3(transitDecision);
+
+        return searchItemContainer;
+    }
+
     private JmeTransitDocumentDataV1 createTransitDocument() {
         return new JmeTransitDocumentDataV1(
                 UUID.randomUUID().toString(),
@@ -156,6 +177,16 @@ public class DomainService implements SearchItemsProvider {
                 randomFrom(List.of(JmeTransitDecisionStatus.values())).name(),
                 randomFrom(REMARKS),
                 randomFrom(OFFICERS),
+                Instant.now().minus(1, ChronoUnit.DAYS),
+                UUID.randomUUID().toString());
+    }
+
+    private JmeTransitDecisionDataV3 createTransitDecisionDtoV3() {
+        return new JmeTransitDecisionDataV3(
+                UUID.randomUUID().toString(),
+                randomFrom(List.of(JmeTransitDecisionStatus.values())).name(),
+                "Café & Müller-AG",
+                "Peter Müller",
                 Instant.now().minus(1, ChronoUnit.DAYS),
                 UUID.randomUUID().toString());
     }

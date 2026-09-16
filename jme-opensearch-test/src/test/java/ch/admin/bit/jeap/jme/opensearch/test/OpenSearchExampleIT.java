@@ -104,31 +104,48 @@ class OpenSearchExampleIT extends BootServiceSpringIntegrationTestBase {
     }
 
     @Test
-    void createsAndIndexesTransitDecision() {
+    void createsAndIndexesTransitDecisionWithCustomAnalysis() {
         Response created = given()
                 .baseUri(RESOURCE_BASE_URL)
                 .when()
-                .post("/api/transitdescisions")
+                .post("/api/v3/transitdescisions")
                 .then()
                 .statusCode(201)
                 .extract().response();
 
         String originId = created.path("searchItem.origin.id");
         String decidedBy = created.path("searchItem.data.decided_by");
+        String remarks = created.path("searchItem.data.remarks");
         assertThat(originId).isNotBlank();
-        assertThat(decidedBy).isNotBlank();
+        assertThat(created.jsonPath().getInt("indexMajorVersion")).isEqualTo(3);
+        assertThat(decidedBy).isEqualTo("Peter Müller");
+        assertThat(remarks).isEqualTo("Café & Müller-AG");
 
         await().atMost(TIMEOUT).pollInterval(Duration.ofSeconds(1)).untilAsserted(() -> {
             Response inspection = given()
                     .baseUri(INSPECTION_BASE_URL)
                     .auth().oauth2(accessToken)
-                    .queryParam("decidedBy", decidedBy)
+                    .queryParam("decidedBy", "peter muller")
                     .when()
                     .get("/api/transitdecisions");
 
             assertThat(inspection.statusCode()).isEqualTo(200);
-            assertThat(inspection.jsonPath().getList("origin.id", String.class)).contains(originId);
+            String createdDecision = "find { it.origin.id == '%s' }".formatted(originId);
+            assertThat(inspection.jsonPath().getString(createdDecision + ".data.decided_by"))
+                    .isEqualTo(decidedBy);
         });
+
+        Response analyzedRemarks = given()
+                .baseUri(INSPECTION_BASE_URL)
+                .auth().oauth2(accessToken)
+                .queryParam("remarks", "cafe muller")
+                .when()
+                .get("/api/transitdecisions/by-remarks");
+
+        assertThat(analyzedRemarks.statusCode()).isEqualTo(200);
+        String createdDecision = "find { it.origin.id == '%s' }".formatted(originId);
+        assertThat(analyzedRemarks.jsonPath().getString(createdDecision + ".data.remarks"))
+                .isEqualTo(remarks);
     }
 
     private static void assertTransitDocumentSearch(String path, String parameter, String value, String originId) {

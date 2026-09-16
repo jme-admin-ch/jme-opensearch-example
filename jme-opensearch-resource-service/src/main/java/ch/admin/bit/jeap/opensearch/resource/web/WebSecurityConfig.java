@@ -16,7 +16,8 @@ public class WebSecurityConfig {
         http.securityMatcher(
                         "/api/transitdocuments/**",
                         "/api/transitdescisions/**",
-                        "/api/v2/transitdescisions/**"
+                        "/api/v2/transitdescisions/**",
+                        "/api/v3/transitdescisions/**"
                 )
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorizeHttpRequests -> authorizeHttpRequests

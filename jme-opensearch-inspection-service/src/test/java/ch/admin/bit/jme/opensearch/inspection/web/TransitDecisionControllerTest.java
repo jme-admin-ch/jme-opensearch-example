@@ -6,12 +6,15 @@ import ch.admin.bit.jeap.opensearch.client.search.SearchItemClient;
 import ch.admin.bit.jeap.opensearch.indextype.IndexType;
 import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionDataV1;
 import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionDataV2;
+import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionDataV3;
 import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionIndexTypeV1;
 import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionIndexTypeV2;
+import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionIndexTypeV3;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.opensearch.client.opensearch._types.FieldSort;
 import org.opensearch.client.opensearch._types.SortOrder;
+import org.opensearch.client.opensearch._types.query_dsl.Operator;
 import org.opensearch.client.opensearch._types.query_dsl.PrefixQuery;
 import org.opensearch.client.opensearch._types.query_dsl.Query;
 import org.opensearch.client.opensearch.core.SearchRequest;
@@ -45,6 +48,8 @@ class TransitDecisionControllerTest {
             JmeTransitDecisionIndexTypeV1.INSTANCE;
     private static final IndexType<JmeTransitDecisionDataV2> INDEX_TYPE_V2 =
             JmeTransitDecisionIndexTypeV2.INSTANCE;
+    private static final IndexType<JmeTransitDecisionDataV3> INDEX_TYPE_V3 =
+            JmeTransitDecisionIndexTypeV3.INSTANCE;
 
     @Autowired
     private MockMvc mockMvc;
@@ -57,7 +62,7 @@ class TransitDecisionControllerTest {
     @Test
     void list_withDecidedByParam_callsSearchWithUserAuth_withPrefixQueryAndDefaultPage() throws Exception {
         SearchItemTyped<JmeTransitDecisionDataV1> item = decisionItem("dec-1", BP1);
-        when(searchItemClient.searchMultiVersionWithUserAuth(eq(List.of(INDEX_TYPE, INDEX_TYPE_V2)), any(Query.class), any(Consumer.class)))
+        when(searchItemClient.searchMultiVersionWithUserAuth(eq(List.of(INDEX_TYPE, INDEX_TYPE_V2, INDEX_TYPE_V3)), any(Query.class), any(Consumer.class)))
                 .thenReturn(List.of(item));
 
         mockMvc.perform(get("/api/transitdecisions")
@@ -71,7 +76,7 @@ class TransitDecisionControllerTest {
         ArgumentCaptor<Consumer<SearchRequest.Builder>> customizerCaptor =
                 ArgumentCaptor.forClass(Consumer.class);
         verify(searchItemClient).searchMultiVersionWithUserAuth(
-                eq(List.of(INDEX_TYPE, INDEX_TYPE_V2)), queryCaptor.capture(), customizerCaptor.capture());
+                eq(List.of(INDEX_TYPE, INDEX_TYPE_V2, INDEX_TYPE_V3)), queryCaptor.capture(), customizerCaptor.capture());
 
         Query effective = queryCaptor.getValue();
         assertThat(effective.isPrefix()).as("V3: decidedBy must produce a prefix query").isTrue();
@@ -90,7 +95,7 @@ class TransitDecisionControllerTest {
         // V3 startsWith semantics example: "F" should match items whose decided_by tokens
         // start with f/F. The controller forwards the raw value; the case-insensitivity
         // flag is what makes the OpenSearch query match across cases.
-        when(searchItemClient.searchMultiVersionWithUserAuth(eq(List.of(INDEX_TYPE, INDEX_TYPE_V2)), any(Query.class), any(Consumer.class)))
+        when(searchItemClient.searchMultiVersionWithUserAuth(eq(List.of(INDEX_TYPE, INDEX_TYPE_V2, INDEX_TYPE_V3)), any(Query.class), any(Consumer.class)))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/api/transitdecisions").param("decidedBy", "F"))
@@ -98,7 +103,7 @@ class TransitDecisionControllerTest {
 
         ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
         verify(searchItemClient).searchMultiVersionWithUserAuth(
-                eq(List.of(INDEX_TYPE, INDEX_TYPE_V2)), queryCaptor.capture(), any(Consumer.class));
+                eq(List.of(INDEX_TYPE, INDEX_TYPE_V2, INDEX_TYPE_V3)), queryCaptor.capture(), any(Consumer.class));
 
         PrefixQuery prefix = queryCaptor.getValue().prefix();
         assertThat(prefix.value()).isEqualTo("F");
@@ -120,7 +125,7 @@ class TransitDecisionControllerTest {
     void list_emptyDecidedByParam_isAccepted_prefixWithEmptyString() throws Exception {
         // Empty string is syntactically valid: prefix("") matches every value.
         // We don't add a separate validation in V3; the test pins that behaviour.
-        when(searchItemClient.searchMultiVersionWithUserAuth(eq(List.of(INDEX_TYPE, INDEX_TYPE_V2)), any(Query.class), any(Consumer.class)))
+        when(searchItemClient.searchMultiVersionWithUserAuth(eq(List.of(INDEX_TYPE, INDEX_TYPE_V2, INDEX_TYPE_V3)), any(Query.class), any(Consumer.class)))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/api/transitdecisions").param("decidedBy", ""))
@@ -128,13 +133,13 @@ class TransitDecisionControllerTest {
 
         ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
         verify(searchItemClient).searchMultiVersionWithUserAuth(
-                eq(List.of(INDEX_TYPE, INDEX_TYPE_V2)), queryCaptor.capture(), any(Consumer.class));
+                eq(List.of(INDEX_TYPE, INDEX_TYPE_V2, INDEX_TYPE_V3)), queryCaptor.capture(), any(Consumer.class));
         assertThat(queryCaptor.getValue().prefix().value()).isEmpty();
     }
 
     @Test
     void list_indexTypeAccessDenied_returns403() throws Exception {
-        when(searchItemClient.searchMultiVersionWithUserAuth(eq(List.of(INDEX_TYPE, INDEX_TYPE_V2)), any(Query.class), any(Consumer.class)))
+        when(searchItemClient.searchMultiVersionWithUserAuth(eq(List.of(INDEX_TYPE, INDEX_TYPE_V2, INDEX_TYPE_V3)), any(Query.class), any(Consumer.class)))
                 .thenThrow(IndexTypeAccessDeniedException.noAuthorization(INDEX_TYPE));
 
         mockMvc.perform(get("/api/transitdecisions").param("decidedBy", "alice"))
@@ -144,7 +149,7 @@ class TransitDecisionControllerTest {
 
     @Test
     void list_withPageableParams_forwardsPagingAndSortingToTheSearchRequest() throws Exception {
-        when(searchItemClient.searchMultiVersionWithUserAuth(eq(List.of(INDEX_TYPE, INDEX_TYPE_V2)), any(Query.class), any(Consumer.class)))
+        when(searchItemClient.searchMultiVersionWithUserAuth(eq(List.of(INDEX_TYPE, INDEX_TYPE_V2, INDEX_TYPE_V3)), any(Query.class), any(Consumer.class)))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/api/transitdecisions")
@@ -157,13 +162,36 @@ class TransitDecisionControllerTest {
         ArgumentCaptor<Consumer<SearchRequest.Builder>> customizerCaptor =
                 ArgumentCaptor.forClass(Consumer.class);
         verify(searchItemClient).searchMultiVersionWithUserAuth(
-                eq(List.of(INDEX_TYPE, INDEX_TYPE_V2)), any(Query.class), customizerCaptor.capture());
+                eq(List.of(INDEX_TYPE, INDEX_TYPE_V2, INDEX_TYPE_V3)), any(Query.class), customizerCaptor.capture());
 
         SearchRequest req = capturedSearchRequest(customizerCaptor.getValue());
         assertThat(req.from()).isEqualTo(10);
         assertThat(req.size()).isEqualTo(5);
         assertSortedBy(req, "data.decision_date", SortOrder.Asc);
     }
+
+    @Test
+    void listByRemarks_usesMatchQueryAndAllIndexVersions() throws Exception {
+        when(searchItemClient.searchMultiVersionWithUserAuth(
+                eq(List.of(INDEX_TYPE, INDEX_TYPE_V2, INDEX_TYPE_V3)), any(Query.class), any(Consumer.class)))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/transitdecisions/by-remarks")
+                        .param("remarks", "cafe muller")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(searchItemClient).searchMultiVersionWithUserAuth(
+                eq(List.of(INDEX_TYPE, INDEX_TYPE_V2, INDEX_TYPE_V3)), queryCaptor.capture(), any(Consumer.class));
+
+        Query query = queryCaptor.getValue();
+        assertThat(query.isMatch()).isTrue();
+        assertThat(query.match().field()).isEqualTo("data.remarks");
+        assertThat(query.match().query().stringValue()).isEqualTo("cafe muller");
+        assertThat(query.match().operator()).isEqualTo(Operator.And);
+    }
+
     /**
      * The result is capped at a page size, so the search must impose an explicit order. Without it
      * OpenSearch returns an arbitrary slice of the matches and a freshly indexed item can stay

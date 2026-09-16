@@ -7,6 +7,7 @@ import ch.admin.bit.jeap.opensearch.resource.kafka.builder.JmeCreateTransitDocum
 import ch.admin.bit.jeap.opensearch.resource.kafka.builder.JmeTransitDecisionCreatedEventBuilder;
 import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionDataV1;
 import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionDataV2;
+import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionDataV3;
 import ch.admin.bit.jme.opensearch.index.jme.transitdocument.JmeTransitDocumentDataV1;
 import ch.admin.bit.jme.transit.JmeCreateTransitDocumentCommand;
 import ch.admin.bit.jme.transit.JmeTransitDecisionCreatedEvent;
@@ -63,6 +64,22 @@ public class DomainMessagePublisher implements MessagePublisher {
 
     @Override
     public void transitDecisionCreatedV2(JmeTransitDecisionDataV2 transitDecision) {
+        JmeTransitDecisionCreatedEvent event = JmeTransitDecisionCreatedEventBuilder.createForProcessId(
+                        UUID.randomUUID().toString(), serviceName())
+                .idempotenceId(UUID.randomUUID().toString())
+                .transitDecisionId(transitDecision.transitDecisionIdentifier())
+                .status(JmeTransitDecisionStatus.valueOf(transitDecision.status()))
+                .remarks(transitDecision.remarks())
+                .decidedBy(transitDecision.decidedBy())
+                .decisionDate(transitDecision.decisionDate())
+                .transitDocumentReferenceId(transitDecision.transitDocumentId())
+                .transitDecisionReferenceId(UUID.randomUUID().toString())
+                .build();
+        send(event, topicConfiguration.getTransitDecisionCreated());
+    }
+
+    @Override
+    public void transitDecisionCreatedV3(JmeTransitDecisionDataV3 transitDecision) {
         JmeTransitDecisionCreatedEvent event = JmeTransitDecisionCreatedEventBuilder.createForProcessId(
                         UUID.randomUUID().toString(), serviceName())
                 .idempotenceId(UUID.randomUUID().toString())
