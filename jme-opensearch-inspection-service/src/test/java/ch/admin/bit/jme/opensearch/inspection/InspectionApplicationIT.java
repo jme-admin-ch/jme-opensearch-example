@@ -7,7 +7,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.opensearch._types.Refresh;
-import org.opensearch.testcontainers.OpensearchContainer;
+import org.opensearch.testcontainers.OpenSearchContainer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -45,8 +45,8 @@ class InspectionApplicationIT {
     private static final List<String> CUSTOMS_CODES = List.of("A1", "B2");
 
     @Container
-    static final OpensearchContainer<?> OPENSEARCH =
-            new OpensearchContainer<>("opensearchproject/opensearch:3.3.2");
+    static final OpenSearchContainer<?> OPENSEARCH =
+            new OpenSearchContainer<>("opensearchproject/opensearch:3.3.2");
 
     @DynamicPropertySource
     static void registerProperties(DynamicPropertyRegistry registry) {
