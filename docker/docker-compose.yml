@@ -4,7 +4,7 @@ services:
   ############################################
 
   broker:
-    image: confluentinc/cp-kafka:8.2.0
+    image: confluentinc/cp-kafka:8.3.2
     hostname: broker
     ports:
       - "12000:12000"
@@ -31,7 +31,7 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   broker-init:
-    image: confluentinc/cp-kafka:8.2.0
+    image: confluentinc/cp-kafka:8.3.2
     command: >
       bash -c "for attempt in {1..60}; do
         kafka-configs --bootstrap-server broker:29092 --alter --add-config 'SCRAM-SHA-512=[password=broker-secret]' --entity-type users --entity-name broker-user &&
@@ -49,7 +49,7 @@ services:
       start_period: 90s
 
   schema-registry:
-    image: confluentinc/cp-schema-registry:8.2.0
+    image: confluentinc/cp-schema-registry:8.3.2
     hostname: schema-registry
     depends_on:
       broker:
@@ -68,7 +68,7 @@ services:
 
   opensearch:
     # Keep OpenSearch and Dashboards on the latest patch published for both images in the 3.3 line.
-    image: opensearchproject/opensearch:3.3.0
+    image: opensearchproject/opensearch:3.9.0
     environment:
       - discovery.type=single-node
       - DISABLE_INSTALL_DEMO_CONFIG=true
@@ -89,7 +89,7 @@ services:
       retries: 10
 
   opensearch-dashboards:
-    image: opensearchproject/opensearch-dashboards:3.3.0
+    image: opensearchproject/opensearch-dashboards:3.9.0
     depends_on:
       opensearch:
         condition: service_healthy
