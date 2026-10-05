@@ -6,13 +6,13 @@
     <parent>
         <groupId>ch.admin.bit.jeap</groupId>
         <artifactId>jeap-spring-boot-parent</artifactId>
-        <version>41.14.0</version>
+        <version>41.17.0</version>
         <relativePath/>
     </parent>
 
     <groupId>ch.admin.bit.jeap</groupId>
     <artifactId>jme-opensearch-example</artifactId>
-    <version>2.1.1-SNAPSHOT</version>
+    <version>2.2.0-SNAPSHOT</version>
     <name>JME OpenSearch Example</name>
     <description>Example demonstrating event-driven indexing and authorization-aware searches with the jEAP OpenSearch components.</description>
     <packaging>pom</packaging>
