@@ -1,6 +1,6 @@
 publiccodeYmlVersion: 0.5.0
 name: jme-opensearch-example
-softwareVersion: 2.17.0
+softwareVersion: 2.18.0
 releaseDate: 2026-11-04
 applicationSuite: JME
 url: "https://github.com/jme-admin-ch/jme-opensearch-example.git"
