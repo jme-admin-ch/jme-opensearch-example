@@ -3,6 +3,8 @@ package ch.admin.bit.jeap.opensearch.resource.domain;
 import ch.admin.bit.jeap.opensearch.indextype.Origin;
 import ch.admin.bit.jeap.opensearch.indextype.SearchItem;
 import ch.admin.bit.jeap.opensearch.searchitem.api.SearchItemsProvider;
+import ch.admin.bit.jeap.opensearch.searchitem.api.exception.SearchItemsBadInputException;
+import ch.admin.bit.jeap.opensearch.searchitem.api.exception.UnsupportedIndexMajorVersionException;
 import ch.admin.bit.jeap.opensearch.searchitem.model.SearchItemContainer;
 import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionDataV1;
 import ch.admin.bit.jme.opensearch.index.jme.transitdecision.JmeTransitDecisionDataV2;
@@ -23,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
+import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
@@ -52,7 +55,7 @@ public class DomainService implements SearchItemsProvider {
     private static final List<String> URLS = List.of(
             "https://github.com/jme-admin-ch/jme-opensearch-example", "https://www.google.com/", "https://hello.ch"
     );
-    private static final String TRANSIT_DECISION_INDEX_TYPE = "JmeTransitDecision";
+    static final String TRANSIT_DECISION_INDEX_TYPE = "JmeTransitDecision";
     private static final Random RANDOM = new Random();
 
     private final DomainRepository domainRepository;
@@ -61,6 +64,26 @@ public class DomainService implements SearchItemsProvider {
     @Override
     public Optional<SearchItemContainer> findSearchItem(String indexType, String originId, String originVersion) {
         return domainRepository.findSearchItem(indexType, originId, originVersion);
+    }
+
+    /**
+     * Loads the current transit decision and builds the representation for the requested schema major. The same
+     * object is available in majors 1, 2 and 3; any other major is reported as unsupported instead of falling back
+     * to another one. Other index types keep the default behaviour of {@link SearchItemsProvider}.
+     */
+    @Override
+    public Optional<SearchItemContainer> findCurrentSearchItem(String indexType, String originId, int indexMajorVersion)
+            throws SearchItemsBadInputException, UnsupportedIndexMajorVersionException {
+        if (!TRANSIT_DECISION_INDEX_TYPE.equals(indexType)) {
+            return SearchItemsProvider.super.findCurrentSearchItem(indexType, originId, indexMajorVersion);
+        }
+        Function<TransitDecision, SearchItemContainer> projection = switch (indexMajorVersion) {
+            case 1 -> DomainService::transitDecisionV1;
+            case 2 -> DomainService::transitDecisionV2;
+            case 3 -> DomainService::transitDecisionV3;
+            default -> throw new UnsupportedIndexMajorVersionException(indexType, indexMajorVersion);
+        };
+        return domainRepository.findCurrentTransitDecision(originId).map(projection);
     }
 
     public SearchItemContainer createAndPublishCreateTransitDocument() {
@@ -83,60 +106,69 @@ public class DomainService implements SearchItemsProvider {
     }
 
     public SearchItemContainer createAndPublishTransitDecision() {
-        JmeTransitDecisionDataV1 transitDecision = createTransitDecisionDto();
-        Origin searchItemOrigin = createOrigin(transitDecision.transitDecisionId());
-
-        SearchItem<JmeTransitDecisionDataV1> searchItem = new SearchItem<>(searchItemOrigin, transitDecision);
-
-        SearchItemContainer searchItemContainer = new SearchItemContainer(
-                1,
-                JmeTransitDecisionIndexTypeV1.INSTANCE.minorVersion(),
-                searchItem
-        );
-
-        domainRepository.saveSearchItemContainer(TRANSIT_DECISION_INDEX_TYPE, searchItemOrigin.id(), null, searchItemContainer);
-
-        messagePublisher.transitDecisionCreated(transitDecision);
-
+        TransitDecision transitDecision = saveTransitDecision(randomFrom(REMARKS), randomFrom(OFFICERS));
+        SearchItemContainer searchItemContainer = saveLiveSearchItem(transitDecisionV1(transitDecision));
+        messagePublisher.transitDecisionCreated(toDataV1(transitDecision));
         return searchItemContainer;
     }
 
     public SearchItemContainer createAndPublishTransitDecisionV2() {
-        JmeTransitDecisionDataV2 transitDecision = createTransitDecisionDtoV2();
-        Origin searchItemOrigin = createOrigin(transitDecision.transitDecisionIdentifier());
-
-        SearchItem<JmeTransitDecisionDataV2> searchItem = new SearchItem<>(searchItemOrigin, transitDecision);
-
-        SearchItemContainer searchItemContainer = new SearchItemContainer(
-                2,
-                JmeTransitDecisionIndexTypeV2.INSTANCE.minorVersion(),
-                searchItem
-        );
-
-        domainRepository.saveSearchItemContainer(TRANSIT_DECISION_INDEX_TYPE, searchItemOrigin.id(), null, searchItemContainer);
-
-        messagePublisher.transitDecisionCreatedV2(transitDecision);
-
+        TransitDecision transitDecision = saveTransitDecision(randomFrom(REMARKS), randomFrom(OFFICERS));
+        SearchItemContainer searchItemContainer = saveLiveSearchItem(transitDecisionV2(transitDecision));
+        messagePublisher.transitDecisionCreatedV2(toDataV2(transitDecision));
         return searchItemContainer;
     }
 
     public SearchItemContainer createAndPublishTransitDecisionV3() {
-        JmeTransitDecisionDataV3 transitDecision = createTransitDecisionDtoV3();
-        Origin searchItemOrigin = createOrigin(transitDecision.transitDecisionIdentifier());
-
-        SearchItem<JmeTransitDecisionDataV3> searchItem = new SearchItem<>(searchItemOrigin, transitDecision);
-
-        SearchItemContainer searchItemContainer = new SearchItemContainer(
-                3,
-                JmeTransitDecisionIndexTypeV3.INSTANCE.minorVersion(),
-                searchItem
-        );
-
-        domainRepository.saveSearchItemContainer(TRANSIT_DECISION_INDEX_TYPE, searchItemOrigin.id(), null, searchItemContainer);
-
-        messagePublisher.transitDecisionCreatedV3(transitDecision);
-
+        TransitDecision transitDecision = saveTransitDecision("Café & Müller-AG", "Peter Müller");
+        SearchItemContainer searchItemContainer = saveLiveSearchItem(transitDecisionV3(transitDecision));
+        messagePublisher.transitDecisionCreatedV3(toDataV3(transitDecision));
         return searchItemContainer;
+    }
+
+    private TransitDecision saveTransitDecision(String remarks, String decidedBy) {
+        TransitDecision transitDecision = new TransitDecision(
+                createOrigin(UUID.randomUUID().toString()),
+                randomFrom(List.of(JmeTransitDecisionStatus.values())).name(),
+                remarks,
+                decidedBy,
+                Instant.now().minus(1, ChronoUnit.DAYS),
+                UUID.randomUUID().toString());
+        domainRepository.saveCurrentTransitDecision(transitDecision);
+        return transitDecision;
+    }
+
+    private SearchItemContainer saveLiveSearchItem(SearchItemContainer searchItemContainer) {
+        domainRepository.saveSearchItemContainer(TRANSIT_DECISION_INDEX_TYPE,
+                searchItemContainer.searchItem().origin().id(), null, searchItemContainer);
+        return searchItemContainer;
+    }
+
+    private static SearchItemContainer transitDecisionV1(TransitDecision transitDecision) {
+        return new SearchItemContainer(1, JmeTransitDecisionIndexTypeV1.INSTANCE.minorVersion(),
+                new SearchItem<>(transitDecision.origin(), toDataV1(transitDecision)));
+    }
+
+    private static SearchItemContainer transitDecisionV2(TransitDecision transitDecision) {
+        return new SearchItemContainer(2, JmeTransitDecisionIndexTypeV2.INSTANCE.minorVersion(),
+                new SearchItem<>(transitDecision.origin(), toDataV2(transitDecision)));
+    }
+
+    private static SearchItemContainer transitDecisionV3(TransitDecision transitDecision) {
+        return new SearchItemContainer(3, JmeTransitDecisionIndexTypeV3.INSTANCE.minorVersion(),
+                new SearchItem<>(transitDecision.origin(), toDataV3(transitDecision)));
+    }
+
+    private static JmeTransitDecisionDataV1 toDataV1(TransitDecision d) {
+        return new JmeTransitDecisionDataV1(d.id(), d.status(), d.remarks(), d.decidedBy(), d.decisionDate(), d.transitDocumentId());
+    }
+
+    private static JmeTransitDecisionDataV2 toDataV2(TransitDecision d) {
+        return new JmeTransitDecisionDataV2(d.id(), d.status(), d.remarks(), d.decidedBy(), d.decisionDate(), d.transitDocumentId());
+    }
+
+    private static JmeTransitDecisionDataV3 toDataV3(TransitDecision d) {
+        return new JmeTransitDecisionDataV3(d.id(), d.status(), d.remarks(), d.decidedBy(), d.decisionDate(), d.transitDocumentId());
     }
 
     private JmeTransitDocumentDataV1 createTransitDocument() {
@@ -160,36 +192,6 @@ public class DomainService implements SearchItemsProvider {
                                 "Zurich",
                                 List.of("documentary"),
                                 new JmeTransitDocumentDataV1.CustomsChecks.Details(List.of("C3")))));
-    }
-
-    private JmeTransitDecisionDataV1 createTransitDecisionDto() {
-        return new JmeTransitDecisionDataV1(
-                UUID.randomUUID().toString(),
-                randomFrom(List.of(JmeTransitDecisionStatus.values())).name(),
-                randomFrom(REMARKS),
-                randomFrom(OFFICERS),
-                Instant.now().minus(1, ChronoUnit.DAYS),
-                UUID.randomUUID().toString());
-    }
-
-    private JmeTransitDecisionDataV2 createTransitDecisionDtoV2() {
-        return new JmeTransitDecisionDataV2(
-                UUID.randomUUID().toString(),
-                randomFrom(List.of(JmeTransitDecisionStatus.values())).name(),
-                randomFrom(REMARKS),
-                randomFrom(OFFICERS),
-                Instant.now().minus(1, ChronoUnit.DAYS),
-                UUID.randomUUID().toString());
-    }
-
-    private JmeTransitDecisionDataV3 createTransitDecisionDtoV3() {
-        return new JmeTransitDecisionDataV3(
-                UUID.randomUUID().toString(),
-                randomFrom(List.of(JmeTransitDecisionStatus.values())).name(),
-                "Café & Müller-AG",
-                "Peter Müller",
-                Instant.now().minus(1, ChronoUnit.DAYS),
-                UUID.randomUUID().toString());
     }
 
     private static Map<String, String> createUrl() {

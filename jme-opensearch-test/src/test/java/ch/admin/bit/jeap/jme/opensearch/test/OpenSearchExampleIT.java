@@ -148,6 +148,61 @@ class OpenSearchExampleIT extends BootServiceSpringIntegrationTestBase {
                 .isEqualTo(remarks);
     }
 
+    @Test
+    void providesCurrentTransitDecisionInRequestedSchemaMajor() {
+        String originId = given()
+                .baseUri(RESOURCE_BASE_URL)
+                .when()
+                .post("/api/v3/transitdescisions")
+                .then()
+                .statusCode(201)
+                .extract().path("searchItem.origin.id");
+        String searchItemReadToken = clientCredentialsToken("index-writer-read-client");
+
+        Response major1 = currentSearchItem(searchItemReadToken, originId, 1);
+        assertThat(major1.statusCode()).isEqualTo(200);
+        assertThat(major1.header("index-major-version")).isEqualTo("1");
+        assertThat(major1.header("index-minor-version")).isEqualTo("0");
+        assertThat(major1.jsonPath().getString("data.transit_decision_id")).isEqualTo(originId);
+
+        Response major2 = currentSearchItem(searchItemReadToken, originId, 2);
+        assertThat(major2.statusCode()).isEqualTo(200);
+        assertThat(major2.header("index-major-version")).isEqualTo("2");
+        assertThat(major2.jsonPath().getString("data.transit_decision_identifier")).isEqualTo(originId);
+        assertThat(major2.jsonPath().getString("origin.version")).isEqualTo(major1.jsonPath().getString("origin.version"));
+
+        Response unsupported = currentSearchItem(searchItemReadToken, originId, 4);
+        assertThat(unsupported.statusCode()).isEqualTo(422);
+        assertThat(unsupported.jsonPath().getString("code")).isEqualTo("UNSUPPORTED_INDEX_MAJOR_VERSION");
+
+        assertThat(currentSearchItem(accessToken, originId, 1).statusCode()).isEqualTo(401);
+    }
+
+    private static Response currentSearchItem(String token, String originId, int indexMajorVersion) {
+        return given()
+                .baseUri(RESOURCE_BASE_URL)
+                .auth().oauth2(token)
+                .queryParam("index_type", "JmeTransitDecision")
+                .queryParam("origin_id", originId)
+                .queryParam("index_major_version", indexMajorVersion)
+                .when()
+                .get("/index-api/searchitems");
+    }
+
+    private static String clientCredentialsToken(String clientId) {
+        return given()
+                .baseUri(AUTH_BASE_URL)
+                .contentType("application/x-www-form-urlencoded")
+                .formParam("grant_type", "client_credentials")
+                .formParam("client_id", clientId)
+                .formParam("client_secret", "secret")
+                .when()
+                .post("/oauth2/token")
+                .then()
+                .statusCode(200)
+                .extract().path("access_token");
+    }
+
     private static void assertTransitDocumentSearch(String path, String parameter, String value, String originId) {
         Response response = given()
                 .baseUri(INSPECTION_BASE_URL)

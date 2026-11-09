@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.24.0] - 2026-11-12
+
+### Added
+- Resource service returns the current transit decision in schema majors 1, 2 and 3 for `index_major_version` requests and answers `422` for unsupported majors
+- Unit, endpoint and end-to-end tests and README walkthrough for requesting a schema major
+
+### Dependencies
+- **ch.admin.bit.jeap:jeap-spring-boot-parent**: 41.36.0 → 41.37.0 (minor)
+- **ch.admin.bit.jeap:jeap-opensearch-index-writer-service-instance**: 6.19.0 → 6.20.0 (minor)
+
 ## [2.23.0] - 2026-11-12
 
 ### Dependencies

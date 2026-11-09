@@ -11,6 +11,15 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DomainRepository {
 
     private final Map<SearchItemIdentifier, SearchItemContainer> searchItems = new ConcurrentHashMap<>();
+    private final Map<String, TransitDecision> currentTransitDecisions = new ConcurrentHashMap<>();
+
+    public Optional<TransitDecision> findCurrentTransitDecision(String id) {
+        return Optional.ofNullable(currentTransitDecisions.get(id));
+    }
+
+    public void saveCurrentTransitDecision(TransitDecision transitDecision) {
+        currentTransitDecisions.put(transitDecision.id(), transitDecision);
+    }
 
     public Optional<SearchItemContainer> findSearchItem(String indexType, String originId, String originVersion) {
         return Optional.ofNullable(searchItems.get(new SearchItemIdentifier(indexType, originId, originVersion)));

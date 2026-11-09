@@ -225,6 +225,36 @@ curl --fail --silent --get \
   --header "Authorization: Bearer $TOKEN" | jq .
 ```
 
+Request the current data of the decision in a fixed schema major, as a maintenance job does. This uses the index
+writer's OAuth client, which holds the `searchitem:read` role:
+
+```bash
+READ_TOKEN=$(curl --fail --silent --request POST \
+  http://localhost:8180/jme-opensearch-auth-scs/oauth2/token \
+  --header 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode 'grant_type=client_credentials' \
+  --data-urlencode 'client_id=index-writer-read-client' \
+  --data-urlencode 'client_secret=secret' | jq --raw-output '.access_token')
+DECISION_ID=$(jq --raw-output '.searchItem.origin.id' <<< "$DECISION")
+
+for MAJOR in 1 2 4; do
+  curl --silent --include --get \
+    http://localhost:8581/jme-opensearch-resource-service/index-api/searchitems \
+    --data-urlencode 'index_type=JmeTransitDecision' \
+    --data-urlencode "origin_id=$DECISION_ID" \
+    --data-urlencode "index_major_version=$MAJOR" \
+    --header "Authorization: Bearer $READ_TOKEN"
+  echo
+done
+```
+
+The same current decision is returned for majors 1 and 2. The payload shape follows the major (`transit_decision_id` in
+major 1, `transit_decision_identifier` in major 2), and the `index-major-version` / `index-minor-version` headers state
+what the provider produced. `origin.version` (`1.0.0`) is the business revision of the decision and is the same in
+both answers. The schema major is neither that version nor a physical index name: the writer derives the target index
+(`jme_transit_decision_v1_write`) from the index type. Major 4 does not exist, so the provider answers
+`422 UNSUPPORTED_INDEX_MAJOR_VERSION` instead of returning another major.
+
 Inspect the created indices:
 
 ```bash
@@ -248,6 +278,7 @@ All paths below are relative to the service context path shown in the local endp
 | `POST /api/transitdocuments` | Creates a V1 transit document, stores its SearchItem and publishes `JmeCreateTransitDocumentCommand`; returns HTTP 201. |
 | `POST /api/transitdescisions` | Creates a V1 transit decision, stores its SearchItem and publishes `JmeTransitDecisionCreatedEvent`; returns HTTP 201. |
 | `POST /api/v2/transitdescisions` | Creates a V2 transit decision and publishes the same event type; returns HTTP 201. |
+| `GET /index-api/searchitems` | SearchItem provider endpoint (role `searchitem:read`). Without `index_major_version` it returns the stored item as before. With `index_major_version=1`, `2` or `3` it builds the current transit decision for that schema major; other majors answer `422`. See [SearchItem endpoint](https://github.com/jeap-admin-ch/jeap-opensearch-searchitem-api/blob/master/docs/endpoint.md). |
 
 The misspelled `transitdescisions` path is retained for compatibility with the original example.
 
