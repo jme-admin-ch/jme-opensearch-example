@@ -76,6 +76,8 @@ services:
       # Disable disk watermark checks for local development (avoids index-create blocks on low-disk hosts)
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
       - cluster.routing.allocation.disk.threshold_enabled=false
+      # ISM attaches policies asynchronously on its job interval (default 5 minutes); 1 minute keeps the policy check demo short
+      - plugins.index_state_management.job_interval=1
     ports:
       - "9200:9200"
     healthcheck:

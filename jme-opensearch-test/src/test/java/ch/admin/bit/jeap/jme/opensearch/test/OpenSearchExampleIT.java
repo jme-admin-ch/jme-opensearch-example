@@ -1,15 +1,24 @@
 package ch.admin.bit.jeap.jme.opensearch.test;
 
 import ch.admin.bit.jeap.jme.test.BootServiceSpringIntegrationTestBase;
+import ch.admin.bit.jeap.opensearch.indexwriter.domain.maintenance.acceptance.JobTargetAcceptance;
+import ch.admin.bit.jeap.opensearch.indexwriter.domain.maintenance.acceptance.JobTargetNameInvalidException;
+import ch.admin.bit.jeap.opensearch.indexwriter.domain.maintenance.acceptance.JobTargetNotAllowedException;
+import ch.admin.bit.jeap.opensearch.indexwriter.domain.maintenance.acceptance.JobTargetNotConcreteException;
+import ch.admin.bit.jeap.opensearch.indexwriter.domain.maintenance.acceptance.JobTargetNotFoundException;
+import ch.admin.bit.jeap.opensearch.indexwriter.domain.maintenance.acceptance.PolicyCheckOutcome;
 import io.restassured.response.Response;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 /**
@@ -25,6 +34,9 @@ class OpenSearchExampleIT extends BootServiceSpringIntegrationTestBase {
     private static final Duration TIMEOUT = Duration.ofSeconds(120);
 
     private static String accessToken;
+
+    @Value("${jme.opensearch.url}")
+    private String openSearchUrl;
 
     @BeforeAll
     static void startServices() throws Exception {
@@ -176,6 +188,62 @@ class OpenSearchExampleIT extends BootServiceSpringIntegrationTestBase {
         assertThat(unsupported.jsonPath().getString("code")).isEqualTo("UNSUPPORTED_INDEX_MAJOR_VERSION");
 
         assertThat(currentSearchItem(accessToken, originId, 1).statusCode()).isEqualTo(401);
+    }
+
+    @Test
+    void checksAppliedPolicyOfMaintenanceTarget() {
+        String rolling = "jme_policy_check_rolling-000001";
+        String nonRolling = "jme_policy_check_non_rolling-000001";
+        String unmanaged = "jme_policy_check_unmanaged-000001";
+        IsmFixtures ism = new IsmFixtures(openSearchUrl);
+        try (MaintenancePolicyCheck policyCheck = new MaintenancePolicyCheck(openSearchUrl)) {
+            ism.ensureIsmConfigIndexOpen();
+            List.of(rolling, nonRolling, unmanaged).forEach(ism::recreateIndex);
+            ism.recreatePolicies();
+            ism.attachPolicy(rolling, IsmFixtures.ROLLOVER_POLICY_ID);
+            ism.attachPolicy(nonRolling, IsmFixtures.NO_ROLLOVER_POLICY_ID);
+            ism.awaitPoliciesApplied(policyCheck, Map.of(
+                    rolling, PolicyCheckOutcome.ROLLOVER_IN_POLICY,
+                    nonRolling, PolicyCheckOutcome.NO_ROLLOVER_IN_POLICY));
+
+            JobTargetAcceptance refused = policyCheck.check(rolling);
+            assertThat(refused.allowed()).isFalse();
+            assertThat(refused.reason()).contains(rolling, IsmFixtures.ROLLOVER_POLICY_ID, "[warm]");
+            assertThatThrownBy(refused::requireAllowed)
+                    .isInstanceOfSatisfying(JobTargetNotAllowedException.class,
+                            e -> assertThat(e.getErrorCode()).isEqualTo("not-allowed"));
+
+            assertThat(policyCheck.check(nonRolling).allowed()).isTrue();
+            JobTargetAcceptance noPolicy = policyCheck.check(unmanaged);
+            assertThat(noPolicy.outcome()).isEqualTo(PolicyCheckOutcome.NO_POLICY_APPLIED);
+            assertThat(noPolicy.allowed()).isTrue();
+            assertThat(noPolicy.reason()).contains(unmanaged, "No ISM policy is reported as applied");
+
+            ism.withUnreadablePolicyMetadata(() -> {
+                JobTargetAcceptance undetermined = policyCheck.check(rolling);
+                assertThat(undetermined.outcome()).isEqualTo(PolicyCheckOutcome.POLICY_UNDETERMINED);
+                assertThat(undetermined.allowed()).isTrue();
+                assertThat(undetermined.reason()).contains("could not be determined", "without verifying non-rolling operation");
+            });
+        } finally {
+            List.of(rolling, nonRolling, unmanaged).forEach(ism::deleteIndex);
+            ism.deletePolicies();
+        }
+    }
+
+    @Test
+    void refusesMaintenanceTargetsThatAreNotAnExistingPhysicalIndex() {
+        try (MaintenancePolicyCheck policyCheck = new MaintenancePolicyCheck(openSearchUrl)) {
+            assertThatThrownBy(() -> policyCheck.check("jme_transit_decision_v1_write"))
+                    .isInstanceOfSatisfying(JobTargetNotConcreteException.class, e -> {
+                        assertThat(e).hasMessageContaining("not a concrete index");
+                        assertThat(e.getResolvedIndices()).contains("jme_transit_decision_v1-000001");
+                    });
+            assertThatThrownBy(() -> policyCheck.check("jme_policy_check_missing-000001"))
+                    .isInstanceOf(JobTargetNotFoundException.class).hasMessageContaining("does not exist");
+            assertThatThrownBy(() -> policyCheck.check("jme_*"))
+                    .isInstanceOf(JobTargetNameInvalidException.class);
+        }
     }
 
     private static Response currentSearchItem(String token, String originId, int indexMajorVersion) {

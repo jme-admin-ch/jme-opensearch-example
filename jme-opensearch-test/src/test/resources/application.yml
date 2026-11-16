@@ -14,3 +14,13 @@ spring:
         - "--project-name=${COMPOSE_PROJECT_NAME:jme-opensearch-it}"
       readiness:
         timeout: 120s
+  # The index writer library is on the test classpath only to run the maintenance target policy check
+  autoconfigure:
+    exclude:
+      - ch.admin.bit.jeap.opensearch.indexwriter.domain.DomainConfiguration
+      - ch.admin.bit.jeap.opensearch.indexwriter.adapter.opensearch.AdapterOpenSearchConfiguration
+      - ch.admin.bit.jeap.opensearch.indexwriter.adapter.opensearch.AdapterOpenSearchAwsConfiguration
+
+jme:
+  opensearch:
+    url: "http://localhost:9200"

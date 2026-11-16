@@ -20,7 +20,7 @@ The example covers two indexing flows:
 | `jme-opensearch-resource-service` | Creates transit data, publishes messages and provides SearchItems | 8581 |
 | `jme-opensearch-index-writer-service` | Consumes messages, retrieves SearchItems and writes them to OpenSearch | 8580 |
 | `jme-opensearch-inspection-service` | Provides type-safe, authorization-aware OpenSearch queries | 8582 |
-| `jme-opensearch-test` | Runs the portable transit flows end-to-end against local infrastructure | - |
+| `jme-opensearch-test` | Runs the portable transit flows and the maintenance target policy checks end-to-end against local infrastructure | - |
 
 ## Architecture
 
@@ -107,7 +107,9 @@ The build runs unit tests and license checks as well as two levels of integratio
   document directly and queries it through the authorization-aware REST API.
 - The `jme-opensearch-test` module starts the Compose infrastructure and all four applications. It creates transit
   documents and decisions through the resource API, waits for Kafka processing and verifies the resulting documents
-  through the OAuth-protected inspection API.
+  through the OAuth-protected inspection API. It also runs the maintenance target policy checks (see
+  [Maintenance Target Policy Check](#maintenance-target-policy-check)); these wait for ISM to apply the demo policies
+  on its next job run, which adds up to a few minutes.
 
 Run only the complete local end-to-end test with:
 
@@ -261,11 +263,77 @@ Inspect the created indices:
 curl --fail --silent 'http://localhost:9200/_cat/indices?v'
 ```
 
+### Maintenance Target Policy Check
+
+A maintenance job writes to one fixed physical target index, so the index writer refuses a target that is managed by a
+rolling ISM policy. When a job is created, `JobTargetAcceptanceCheck` reads the policy applied to the target **once**
+with ISM Explain. It looks for a `rollover` action in every state of the policy, including states the index has not
+reached yet. The job API that calls this check (JEAP-7794) is not available yet, so `OpenSearchExampleIT` runs the
+check from the index writer library against this example's OpenSearch. The calls below show what the check reads.
+
+The target must be the physical index (for example `jme_transit_decision_v1-000001`), not the write or read alias.
+An alias, a missing index and an invalid name are not policy results: the check throws
+`JobTargetNotConcreteException`, `JobTargetNotFoundException` or `JobTargetNameInvalidException`.
+
+Attach a policy whose rollover action is in a later state to a demo index:
+
+```bash
+curl --fail --silent --request PUT http://localhost:9200/jme_policy_check_rolling-000001 \
+  --header 'Content-Type: application/json' --data '{"settings":{"number_of_replicas":0}}'
+curl --fail --silent --request PUT http://localhost:9200/_plugins/_ism/policies/jme-policy-check-rollover \
+  --header 'Content-Type: application/json' --data '{"policy":{"description":"demo","default_state":"hot","states":[
+    {"name":"hot","actions":[],"transitions":[{"state_name":"warm","conditions":{"min_index_age":"3650d"}}]},
+    {"name":"warm","actions":[{"rollover":{"min_doc_count":100000000}}],"transitions":[]}]}}'
+curl --fail --silent --request POST http://localhost:9200/_plugins/_ism/add/jme_policy_check_rolling-000001 \
+  --header 'Content-Type: application/json' --data '{"policy_id":"jme-policy-check-rollover"}'
+```
+
+The policy is attached immediately and Explain reports its `policy_id` right away. ISM applies the policy definition
+on its next job run (Compose sets the job interval to one minute, the default is five minutes). Until then the check
+cannot see the rollover action: it reports no policy or `POLICY_UNDETERMINED`, and both are allowed. Read the applied policy as the check
+does:
+
+```bash
+curl --fail --silent \
+  'http://localhost:9200/_plugins/_ism/explain/jme_policy_check_rolling-000001?show_policy=true' \
+  | jq '.["jme_policy_check_rolling-000001"] | {policy_id, rollover_states: [.policy.states[]? | select(any(.actions[]; has("rollover"))) | .name]}'
+```
+
+| Applied policy | Check result | Shown in `OpenSearchExampleIT` with |
+| --- | --- | --- |
+| Rollover action in any state | Refused, `not-allowed` with target and reason; HTTP 422 planned for the job API (JEAP-7794) | `jme_policy_check_rolling-000001` |
+| No rollover action | Allowed | `jme_policy_check_non_rolling-000001` (policy with a `replica_count` action) |
+| No policy attached | Allowed | `jme_policy_check_unmanaged-000001` |
+| Policy metadata cannot be read | Allowed, without claiming that the target is non-rolling | The ISM config index `.opendistro-ism-config` is closed while the check runs |
+
+The test closes `.opendistro-ism-config` only briefly and reopens it afterwards, and it reopens it at the start of every run in case an earlier run was killed. While it is closed, ISM jobs on that cluster pause.
+
+Remove the demo index and policy:
+
+```bash
+curl --silent --request DELETE http://localhost:9200/jme_policy_check_rolling-000001
+curl --silent --request DELETE http://localhost:9200/_plugins/_ism/policies/jme-policy-check-rollover
+```
+
 Stop the infrastructure when finished:
 
 ```bash
 docker compose --file docker/docker-compose.yml down
 ```
+
+#### Permissions on a secured cluster
+
+This example runs OpenSearch **without the security plugin** (`DISABLE_SECURITY_PLUGIN=true` in
+`docker/docker-compose.yml`) and its tests use an unauthenticated client, so it does **not** verify the permissions
+below. On a secured cluster the writer's role needs, for the policy check:
+
+- cluster permission `cluster:admin/opendistro/ism/managedindex/explain`
+- index permission `indices:admin/get` on the target index patterns
+
+Without the explain permission every target is allowed as `policy_undetermined`, and rolling targets are not refused;
+alert on that outcome. See [OpenSearch permissions](https://github.com/jeap-admin-ch/jeap-opensearch-index-writer-service/blob/main/docs/opensearch-permissions.md)
+for the full permission set of the index writer. The library verifies the check against a security-enabled cluster
+with this role in its own integration tests.
 
 ## API Reference
 

@@ -34,6 +34,7 @@ Apache License Version 2.0
  * ch.admin.bit.jeap:jeap-opensearch-index-writer-web - [ch.admin.bit.jeap:jeap-opensearch-index-writer-web](https://github.com/jeap-admin-ch/jeap-opensearch-index-writer-service/tree/main/jeap-opensearch-index-writer-web)
  * ch.admin.bit.jeap:jeap-opensearch-searchitem-api - [ch.admin.bit.jeap:jeap-opensearch-searchitem-api](https://github.com/jeap-admin-ch/jeap-opensearch-searchitem-api/tree/main/jeap-opensearch-searchitem-api)
  * ch.admin.bit.jeap:jeap-opensearch-searchitem-model - [ch.admin.bit.jeap:jeap-opensearch-searchitem-model](https://github.com/jeap-admin-ch/jeap-opensearch-searchitem-api/tree/main/jeap-opensearch-searchitem-model)
+ * ch.admin.bit.jeap:jeap-reaction-observer-header-starter - [ch.admin.bit.jeap:jeap-reaction-observer-header-starter](https://github.com/jeap-admin-ch/jeap-reaction-observer/tree/main/jeap-reaction-observer-header-starter)
  * ch.admin.bit.jeap:jeap-spring-boot-application-starter - [ch.admin.bit.jeap:jeap-spring-boot-application-starter](https://github.com/jeap-admin-ch/jeap-spring-boot-starters/tree/main/jeap-spring-boot-application-starter)
  * ch.admin.bit.jeap:jeap-spring-boot-featureflag-starter - [ch.admin.bit.jeap:jeap-spring-boot-featureflag-starter](https://github.com/jeap-admin-ch/jeap-spring-boot-starters/tree/main/jeap-spring-boot-featureflag-starter)
  * ch.admin.bit.jeap:jeap-spring-boot-logging-starter - [ch.admin.bit.jeap:jeap-spring-boot-logging-starter](https://github.com/jeap-admin-ch/jeap-spring-boot-starters/tree/main/jeap-spring-boot-logging-starter)
