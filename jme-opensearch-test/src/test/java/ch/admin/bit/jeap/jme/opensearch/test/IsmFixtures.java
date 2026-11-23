@@ -1,33 +1,26 @@
 package ch.admin.bit.jeap.jme.opensearch.test;
 
-import ch.admin.bit.jeap.opensearch.indexwriter.domain.maintenance.acceptance.PolicyCheckOutcome;
 import io.restassured.specification.RequestSpecification;
 
 import java.time.Duration;
-import java.util.Map;
 
 import static io.restassured.RestAssured.given;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.is;
 
 /**
- * Plain REST helpers to manage the indices and ISM policies of the maintenance policy check tests. They do not need
- * a Spring context, so cleanup also works when creating the {@link MaintenancePolicyCheck} failed.
+ * Plain REST helpers to manage the indices and ISM policies used to verify that the maintenance job API refuses a
+ * target with a rollover policy. No Spring context is needed, so cleanup also works when a setup step failed.
  */
 final class IsmFixtures {
 
     static final String ROLLOVER_POLICY_ID = "jme-policy-check-rollover";
-    static final String NO_ROLLOVER_POLICY_ID = "jme-policy-check-no-rollover";
     private static final String ISM_CONFIG_INDEX = ".opendistro-ism-config";
     // The rollover action sits in a later state: the check must find it although the index never reaches that state
     private static final String ROLLOVER_POLICY = """
             {"policy":{"description":"Demo: rolls the index over in its warm state","default_state":"hot","states":[
               {"name":"hot","actions":[],"transitions":[{"state_name":"warm","conditions":{"min_index_age":"3650d"}}]},
               {"name":"warm","actions":[{"rollover":{"min_doc_count":100000000}}],"transitions":[]}]}}
-            """;
-    private static final String NO_ROLLOVER_POLICY = """
-            {"policy":{"description":"Demo: manages replicas, never rolls over","default_state":"hot","states":[
-              {"name":"hot","actions":[{"replica_count":{"number_of_replicas":0}}],"transitions":[]}]}}
             """;
     private static final Duration ISM_INITIALIZATION_TIMEOUT = Duration.ofMinutes(5);
 
@@ -50,22 +43,10 @@ final class IsmFixtures {
     void recreatePolicies() {
         deletePolicies();
         openSearch().body(ROLLOVER_POLICY).put("/_plugins/_ism/policies/" + ROLLOVER_POLICY_ID).then().statusCode(201);
-        openSearch().body(NO_ROLLOVER_POLICY).put("/_plugins/_ism/policies/" + NO_ROLLOVER_POLICY_ID).then().statusCode(201);
     }
 
     void deletePolicies() {
-        for (String policyId : new String[]{ROLLOVER_POLICY_ID, NO_ROLLOVER_POLICY_ID}) {
-            openSearch().delete("/_plugins/_ism/policies/" + policyId);
-        }
-    }
-
-    void recreateIndex(String index) {
-        deleteIndex(index);
-        openSearch().body("{\"settings\":{\"number_of_replicas\":0}}").put("/" + index).then().statusCode(200);
-    }
-
-    void deleteIndex(String index) {
-        openSearch().delete("/" + index);
+        openSearch().delete("/_plugins/_ism/policies/" + ROLLOVER_POLICY_ID);
     }
 
     // _ism/add answers 200 even when it cannot attach the policy, the failure is only reported in the body
@@ -76,21 +57,23 @@ final class IsmFixtures {
                 .body("failures", is(false));
     }
 
-    // ISM attaches a policy on its next job run; until then explain reports no policy and the check allows the index
-    void awaitPoliciesApplied(MaintenancePolicyCheck policyCheck, Map<String, PolicyCheckOutcome> expectedByIndex) {
-        await().atMost(ISM_INITIALIZATION_TIMEOUT).pollInterval(Duration.ofSeconds(2))
-                .until(() -> expectedByIndex.entrySet().stream()
-                        .allMatch(e -> policyCheck.check(e.getKey()).outcome() == e.getValue()));
+    void detachPolicy(String index) {
+        openSearch().post("/_plugins/_ism/remove/" + index).then().statusCode(200);
     }
 
-    // Explain reads applied policies from the ISM config index, so while it is closed no policy can be read
-    void withUnreadablePolicyMetadata(Runnable action) {
-        openSearch().post("/" + ISM_CONFIG_INDEX + "/_close").then().statusCode(200);
-        try {
-            action.run();
-        } finally {
-            reopenIsmConfigIndex();
-        }
+    // ISM attaches a policy on its next job run; until then explain reports no policy and the job API would accept the index
+    void awaitPolicyAttached(String index, String policyId) {
+        await().atMost(ISM_INITIALIZATION_TIMEOUT).pollInterval(Duration.ofSeconds(2))
+                .until(() -> explain(index).contains("\"policy_id\":\"" + policyId + "\""));
+    }
+
+    void awaitPolicyDetached(String index) {
+        await().atMost(ISM_INITIALIZATION_TIMEOUT).pollInterval(Duration.ofSeconds(2))
+                .until(() -> explain(index).contains("\"index.plugins.index_state_management.policy_id\":null"));
+    }
+
+    private String explain(String index) {
+        return openSearch().get("/_plugins/_ism/explain/" + index).asString();
     }
 
     // The single node cannot assign replicas, so only the primary shard can be awaited

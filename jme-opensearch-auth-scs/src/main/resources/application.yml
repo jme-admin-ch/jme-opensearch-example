@@ -48,6 +48,20 @@ oauth-mock-data:
       userroles: ["jme_no_access"]
       audience:
         - "https://resources.jme.admin.ch/jme/jme-opensearch-inspection-service"
+    - client-id: "job-operator-sys"
+      client-secret: "{noop}secret"
+      context: "SYS"
+      subject: "job-operator-sys"
+      userroles: ["jme_@upsertjob_#create", "jme_@deletejob_#create", "jme_@jobreport_#read"]
+      audience:
+        - "https://resources.jme.admin.ch/jme/jme-opensearch-index-writer-service"
+    - client-id: "job-reader-sys"
+      client-secret: "{noop}secret"
+      context: "SYS"
+      subject: "job-reader-sys"
+      userroles: ["jme_@jobreport_#read"]
+      audience:
+        - "https://resources.jme.admin.ch/jme/jme-opensearch-index-writer-service"
 
 mockserver:
   introspection-endpoint-audience-check: "on"

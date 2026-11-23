@@ -18,9 +18,9 @@ The example covers two indexing flows:
 | --- | --- | ---: |
 | `jme-opensearch-auth-scs` | Local OAuth2 mock server | 8180 |
 | `jme-opensearch-resource-service` | Creates transit data, publishes messages and provides SearchItems | 8581 |
-| `jme-opensearch-index-writer-service` | Consumes messages, retrieves SearchItems and writes them to OpenSearch | 8580 |
+| `jme-opensearch-index-writer-service` | Consumes messages, retrieves SearchItems and writes them to OpenSearch; with maintenance enabled also stores upsert and delete jobs submitted as YAML | 8580 |
 | `jme-opensearch-inspection-service` | Provides type-safe, authorization-aware OpenSearch queries | 8582 |
-| `jme-opensearch-test` | Runs the portable transit flows and the maintenance target policy checks end-to-end against local infrastructure | - |
+| `jme-opensearch-test` | Runs the portable transit flows, the maintenance job API and the maintenance target policy checks end-to-end against local infrastructure, confirming the default non-rollover index lifecycle | - |
 
 ## Architecture
 
@@ -107,8 +107,11 @@ The build runs unit tests and license checks as well as two levels of integratio
   document directly and queries it through the authorization-aware REST API.
 - The `jme-opensearch-test` module starts the Compose infrastructure and all four applications. It creates transit
   documents and decisions through the resource API, waits for Kafka processing and verifies the resulting documents
-  through the OAuth-protected inspection API. It also runs the maintenance target policy checks (see
-  [Maintenance Target Policy Check](#maintenance-target-policy-check)); these wait for ISM to apply the demo policies
+  through the OAuth-protected inspection API. It submits and retrieves upsert and delete jobs through the YAML API,
+  checks their OpenAPI entries, starts a second index writer instance to show that stored jobs are reused and one with
+  maintenance disabled (see [Maintenance Jobs](#maintenance-jobs)). It also verifies that the job API refuses a delete
+  job whose target has a rolling ISM policy applied (see
+  [Maintenance Target Policy Check](#maintenance-target-policy-check)); this waits for ISM to apply the demo policy
   on its next job run, which adds up to a few minutes.
 
 Run only the complete local end-to-end test with:
@@ -145,6 +148,7 @@ Local endpoints:
 
 | Component | URL |
 | --- | --- |
+| Index writer Swagger UI (maintenance job API) | `http://localhost:8580/jme-opensearch-index-writer-service/swagger-ui/index.html` |
 | Resource service Swagger UI | `http://localhost:8581/jme-opensearch-resource-service/swagger-ui/index.html` |
 | Inspection service Swagger UI | `http://localhost:8582/jme-opensearch-inspection-service/swagger-ui/index.html` |
 | OpenSearch API | `http://localhost:9200` |
@@ -263,13 +267,143 @@ Inspect the created indices:
 curl --fail --silent 'http://localhost:9200/_cat/indices?v'
 ```
 
+### Index Lifecycle
+
+This example's business indices (`jme_transit_document_v*`, `jme_transit_decision_v*`,
+`jme_decree_document_v*`) have **no ISM (Index State Management) policy attached by default** — this
+is the normal setup, not something to configure away. Each is created once as `<name>-000001` and
+written, updated and deleted from indefinitely through its write alias; the `-000001` suffix only
+supports a *future* rollover and does not itself enable one. Normal indexing, updating, deleting and
+searching all work this way, including after restarting the stack.
+
+Verify the applied policy of a real business index with ISM Explain:
+
+```bash
+curl --fail --silent 'http://localhost:9200/_plugins/_ism/explain/jme_transit_decision_v1-000001?show_policy=true' | jq .
+```
+
+A missing `policy_id` confirms no policy is attached. Compare this with the
+`jme_policy_check_rolling-000001` demo index below, which has a rollover policy deliberately attached
+to demonstrate the opposite case.
+
+Without rollover, there is no automatic age-based deletion and the single index keeps growing — plan
+`number-of-shards` in `jme-opensearch-index-writer-service/src/main/resources/application-local.yml`
+for the expected volume, and decide deliberately how (or whether) your domain retires old documents,
+rather than relying on index age. Rollover remains available as a separate, deliberate opt-in: attach
+an ISM policy via `ism_template` matching the index pattern, exactly as demonstrated for the
+throwaway demo index in the [Maintenance Target Policy Check](#maintenance-target-policy-check)
+section below. The maintenance job/task indices (`jeap_indexwriter_jobs`, `jeap_indexwriter_tasks`,
+see [Maintenance Jobs](#maintenance-jobs)) must stay outside any such policy if maintenance is
+enabled: their retention is handled by the service's own housekeeping, not by OpenSearch deleting the
+index.
+
+### Maintenance Jobs
+
+An operator submits an upsert or delete job as YAML and reads the YAML report. This version only **stores** jobs: the
+tasks stay open because execution is added in later stories. The local profile enables the feature with
+`jeap.opensearch.indexwriter.maintenance.enabled=true`; the default is `false`, and then the service has no job
+endpoints, no OpenAPI entries, no job indices and no housekeeping, while normal indexing works as before. See the
+[library documentation](https://github.com/jeap-admin-ch/jeap-opensearch-index-writer-service/blob/main/docs/maintenance-jobs.md).
+
+The OAuth mock provides two clients for the job API:
+
+| Client | Roles |
+| --- | --- |
+| `job-operator-sys` | `upsertjob#create`, `deletejob#create`, `jobreport#read` |
+| `job-reader-sys` | `jobreport#read` only (creating a job answers `403`) |
+
+```bash
+JOB_TOKEN=$(curl --fail --silent --request POST \
+  http://localhost:8180/jme-opensearch-auth-scs/oauth2/token \
+  --header 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode 'grant_type=client_credentials' \
+  --data-urlencode 'client_id=job-operator-sys' \
+  --data-urlencode 'client_secret=secret' | jq --raw-output '.access_token')
+WRITER=http://localhost:8580/jme-opensearch-index-writer-service
+```
+
+Submit an upsert job with an explicit schema major. The version `"3"` of the first reference is business metadata that
+is only stored and reported. It never selects a schema, a provider request or a rollback:
+
+```bash
+JOB_ID=$(uuidgen)
+curl --fail --silent --request PUT "$WRITER/api/upsert-jobs/$JOB_ID" \
+  --header "Authorization: Bearer $JOB_TOKEN" --header 'Content-Type: application/yaml' --data-binary @- <<'YAML'
+message:
+  messageName: JmeTransitDecisionCreatedEvent
+  topicName: jme-transit-decision-created
+operation:
+  indexType: JmeTransitDecision
+  indexOperation: UPSERT
+  indexMajorVersion: 2
+originReferences:
+- id: 'ref-1'
+  version: '3'
+- id: 'ref-2'
+YAML
+```
+
+The report names the one fixed target (`selection: explicit`, `index-major-version: 2`,
+`physical-index: jme_transit_decision_v2-000001`) and keeps `version: "3"`. Read it again, also after a restart:
+
+```bash
+curl --fail --silent "$WRITER/api/upsert-jobs/$JOB_ID" \
+  --header "Authorization: Bearer $JOB_TOKEN" --header 'Accept: application/yaml'
+```
+
+Omit `indexMajorVersion` to select the highest configured major (3 for `JmeTransitDecision`; `selection: highest`).
+Delete jobs select a major the same way and have IDs only:
+
+```bash
+curl --fail --silent --request PUT "$WRITER/api/delete-jobs/$(uuidgen)" \
+  --header "Authorization: Bearer $JOB_TOKEN" --header 'Content-Type: application/yaml' --data-binary @- <<'YAML'
+indexType: JmeTransitDecision
+indexMajorVersion: 1
+originReferences:
+- id: 'ref-1'
+- id: 'ref-2'
+YAML
+```
+
+| Request | Answer |
+| --- | --- |
+| Same job ID, equivalent content | `200`, the retained job (submitter and timestamps do not matter) |
+| Same job ID, changed `indexMajorVersion` or stored reference `version` | `409` |
+| Unknown major, duplicate IDs (even with different versions), `version` or `allowRollback` on a delete job, too many references | `400`, nothing stored |
+| Content type other than `application/yaml` / `application/x-yaml` | `415` |
+| Rollover policy or multi-index layout on the target | `422 NOT_ALLOWED` |
+| No token (GET / PUT) / missing role / unknown job / storage unavailable | `401` / `403` / `403` / `404` / `503` |
+
+A `PUT` without token is answered with `403`, not `401`: the jEAP security chain checks CSRF before authentication, and
+only requests that carry a bearer token are exempt from it.
+
+With maintenance enabled the service creates the missing job and task indices (`jeap_indexwriter_jobs`,
+`jeap_indexwriter_tasks`) on startup and reuses compatible existing ones, so jobs survive a restart. Open the
+Swagger UI of the index writer (see the endpoint table) to see both operations with their YAML examples, all
+responses and the required role.
+
+Stop the running index writer, then start it with maintenance disabled to see the default behaviour. The job endpoints
+answer `404`, the OpenAPI document lists no job paths, and the stored jobs stay untouched in OpenSearch:
+
+```bash
+./mvnw -pl jme-opensearch-index-writer-service spring-boot:run -Dspring-boot.run.profiles=local \
+  -Dspring-boot.run.arguments=--jeap.opensearch.indexwriter.maintenance.enabled=false
+curl --silent --output /dev/null --write-out '%{http_code}\n' "$WRITER/api/upsert-jobs/$JOB_ID" \
+  --header "Authorization: Bearer $JOB_TOKEN"
+curl --silent "http://localhost:9200/jeap_indexwriter_jobs/_count"
+```
+
 ### Maintenance Target Policy Check
 
 A maintenance job writes to one fixed physical target index, so the index writer refuses a target that is managed by a
 rolling ISM policy. When a job is created, `JobTargetAcceptanceCheck` reads the policy applied to the target **once**
 with ISM Explain. It looks for a `rollover` action in every state of the policy, including states the index has not
-reached yet. The job API that calls this check (JEAP-7794) is not available yet, so `OpenSearchExampleIT` runs the
-check from the index writer library against this example's OpenSearch. The calls below show what the check reads.
+reached yet. The job API of the [previous section](#maintenance-jobs) calls this check when a job is submitted and answers
+`422 NOT_ALLOWED` for a refused target; `OpenSearchExampleIT` verifies this refusal end-to-end through the job API
+against a live index with a rolling policy attached. The full outcome matrix below (no policy, non-rolling policy,
+undetermined policy, invalid/missing/non-concrete targets) is already covered by `IsmAppliedPolicyInspectorIT` in
+[jeap-opensearch-index-writer-service](https://github.com/jeap-admin-ch/jeap-opensearch-index-writer-service); the
+calls below show what the check reads so you can reproduce each outcome manually against this example's OpenSearch.
 
 The target must be the physical index (for example `jme_transit_decision_v1-000001`), not the write or read alias.
 An alias, a missing index and an invalid name are not policy results: the check throws
@@ -299,14 +433,12 @@ curl --fail --silent \
   | jq '.["jme_policy_check_rolling-000001"] | {policy_id, rollover_states: [.policy.states[]? | select(any(.actions[]; has("rollover"))) | .name]}'
 ```
 
-| Applied policy | Check result | Shown in `OpenSearchExampleIT` with |
-| --- | --- | --- |
-| Rollover action in any state | Refused, `not-allowed` with target and reason; HTTP 422 planned for the job API (JEAP-7794) | `jme_policy_check_rolling-000001` |
-| No rollover action | Allowed | `jme_policy_check_non_rolling-000001` (policy with a `replica_count` action) |
-| No policy attached | Allowed | `jme_policy_check_unmanaged-000001` |
-| Policy metadata cannot be read | Allowed, without claiming that the target is non-rolling | The ISM config index `.opendistro-ism-config` is closed while the check runs |
-
-The test closes `.opendistro-ism-config` only briefly and reopens it afterwards, and it reopens it at the start of every run in case an earlier run was killed. While it is closed, ISM jobs on that cluster pause.
+| Applied policy | Check result |
+| --- | --- |
+| Rollover action in any state | Refused, `not-allowed` with target and reason; HTTP 422 `NOT_ALLOWED` from the job API |
+| No rollover action | Allowed |
+| No policy attached | Allowed |
+| Policy metadata cannot be read (for example while `.opendistro-ism-config` is closed) | Allowed, without claiming that the target is non-rolling |
 
 Remove the demo index and policy:
 

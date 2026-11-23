@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.32.0] - 2026-11-24
+
+### Added
+- Index writer with the maintenance job API enabled in the local profile (`jeap.opensearch.indexwriter.maintenance.enabled`, default `false`); OAuth resource server configuration and OpenAPI/Swagger UI for submitting and reading upsert and delete jobs as YAML
+- OAuth mock clients `job-operator-sys` (`upsertjob#create`, `deletejob#create`, `jobreport#read`) and `job-reader-sys` (`jobreport#read`)
+- End-to-end tests and README walkthrough: both job types with an explicit and an omitted `indexMajorVersion`, upsert reference version retained without influencing the target, `409`/`400`/`415`/`401`/`403`/`404` answers, OpenAPI entries, storage reuse on restart and disabled maintenance
+- README documents the default non-rollover index lifecycle for this example's business indices, with an ISM Explain verification example against a real business index; `OpenSearchExampleIT` guards that a freshly indexed transit document carries no ISM policy
+
+### Dependencies
+- **ch.admin.bit.jeap:jeap-opensearch-index-writer-service-instance**: 6.23.0 → 6.24.0 (minor)
+
 ## [2.31.0] - 2026-11-23
 
 ### Dependencies

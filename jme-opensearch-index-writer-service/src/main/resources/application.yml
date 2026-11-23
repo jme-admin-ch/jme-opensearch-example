@@ -14,6 +14,17 @@ jeap:
       system-name: "JME"
       service-name: "jme-opensearch-index-writer-service"
       error-topic-name: "jme-messageprocessing-failed"
+  security:
+    oauth2:
+      resourceserver:
+        resource-id: "https://resources.jme.admin.ch/jme/jme-opensearch-index-writer-service"
+        strict-audience-validation: "on"
+        system-name: jme
+  opensearch:
+    indexwriter:
+      maintenance:
+        # Off by default: no job API, OpenAPI entries, job indices or housekeeping. The local profile switches it on.
+        enabled: false
 
 togglz:
   feature-enums: ch.admin.bit.jme.opensearch.indexwriter.JmeFeatureFlags

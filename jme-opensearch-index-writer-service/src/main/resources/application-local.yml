@@ -17,8 +17,18 @@ spring:
             jwk-set-uri: "http://localhost:8180/jme-opensearch-auth-scs/.well-known/jwks.json"
 
 jeap:
+  swagger:
+    status: open
+  security:
+    oauth2:
+      resourceserver:
+        authorization-server:
+          issuer: "http://localhost:8180/jme-opensearch-auth-scs"
+          jwk-set-uri: "${jeap.security.oauth2.resourceserver.authorization-server.issuer}/.well-known/jwks.json"
   opensearch:
     indexwriter:
+      maintenance:
+        enabled: true
       connection:
         url: "http://localhost:9200"
       # 0 replicas: single-node local cluster stays GREEN with no replicas
@@ -39,3 +49,9 @@ jme:
   opensearch:
     resource:
       base-uri: "http://localhost:8581/jme-opensearch-resource-service"
+
+# Client of the local OAuth mock, used by the Swagger UI login
+springdoc:
+  swagger-ui:
+    oauth:
+      client-id: "job-operator-sys"
