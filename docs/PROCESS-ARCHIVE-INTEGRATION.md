@@ -26,8 +26,7 @@ The OSS modules own all application code and public dependencies:
 | `jme-opensearch-index-writer-service` | Archived-artifact event type dependency, decree index types, conditions and reference providers |
 | `jme-opensearch-inspection-service` | Decree index types and authorization-aware inspection controllers |
 
-The event and index-type artifact versions this example uses are available from Maven Central; newer releases of these
-artifacts are not published there. No Nivel or AWS dependency is required to compile the integration.
+No Nivel or AWS dependency is required to compile the integration.
 
 ## Deployment Configuration Contract
 
