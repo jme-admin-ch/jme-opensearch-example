@@ -26,8 +26,8 @@ The OSS modules own all application code and public dependencies:
 | `jme-opensearch-index-writer-service` | Archived-artifact event type dependency, decree index types, conditions and reference providers |
 | `jme-opensearch-inspection-service` | Decree index types and authorization-aware inspection controllers |
 
-The event and index-type artifacts are available from Maven Central. No Nivel or AWS dependency is required to compile
-the integration.
+The event and index-type artifact versions this example uses are available from Maven Central; newer releases of these
+artifacts are not published there. No Nivel or AWS dependency is required to compile the integration.
 
 ## Deployment Configuration Contract
 
@@ -48,7 +48,7 @@ configuration supply the concrete endpoint, topic, OAuth and secret settings.
 | Concern | Owner |
 | --- | --- |
 | Conditions, reference providers and inspection controllers | This OSS repository |
-| Message and index-type artifacts | Public JME registries and Maven Central |
+| Message and index-type artifacts | Public JME registries |
 | Process Archive application behavior | JME Process Archive example |
 | Environment endpoints, topics, OAuth clients and secrets | Platform deployment configuration |
 | Deployed cross-application verification | Platform wrapper smoke tests |
